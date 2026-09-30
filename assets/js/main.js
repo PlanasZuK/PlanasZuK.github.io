@@ -1,0 +1,808 @@
+/* polplanas.com
+   The whole site is one canvas of five pages. Scroll pulls the camera back from the landing until you
+   see every page at once; the distance is yours, frame by frame. Pick a page and the camera flies in
+   until it becomes the page. Pictures arrive as prints and develop into colour.
+   GSAP 3.15 (+ScrollTrigger, SplitText), Lenis 1.3 and one WebGL effect (fx.js), one ticker. */
+(() => {
+  const d = document, html = d.documentElement;
+  const $ = (s, c = d) => c.querySelector(s);
+  const $$ = (s, c = d) => [...c.querySelectorAll(s)];
+  if (!window.gsap || !window.ScrollTrigger) { html.classList.remove("js"); return; }
+  gsap.registerPlugin(ScrollTrigger, SplitText);
+  ScrollTrigger.config({ ignoreMobileResize: true });
+
+  const reduce = html.classList.contains("reduced");
+  const touch = matchMedia("(pointer: coarse)").matches;
+  const FXOK = !!(window.FX && FX.supported);
+  const EO = "expo.out";
+  const clamp = gsap.utils.clamp(0, 1);
+  const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const canvas = $("#canvas"), world = $("#world"), host = $("#host");
+  const boards = Object.fromEntries($$(".board").map((b) => [b.dataset.board, b]));
+  const GRID = { work: [1, 0], about: [0, 1], home: [1, 1], services: [2, 1], contact: [1, 2] };
+  const LANG = html.lang, BASE = LANG === "en" ? "/" : `/${LANG}/`;
+  const TITLES = JSON.parse(d.body.dataset.titles || "{}");
+  const view = (id) => $(".board__view", boards[id]);
+  // pages still being made: seen from afar, blurred, not open yet
+  const isLocked = (id) => !!boards[id] && boards[id].classList.contains("is-locked");
+
+  /* ---------------- smooth scroll (page mode only) ---------------- */
+  let lenis = null;
+  if (!reduce && window.Lenis) {
+    lenis = new Lenis({ lerp: 0.1, smoothWheel: true, syncTouch: false });
+    lenis.on("scroll", ScrollTrigger.update);
+    gsap.ticker.add((t) => lenis.raf(t * 1000));
+    gsap.ticker.lagSmoothing(0);
+    lenis.stop();
+  }
+
+  /* ---------------- type that fills its measure ---------------- */
+  function fit(el) {
+    if (!el.offsetParent && !el.closest(".host")) return;
+    const avail = el.clientWidth;
+    if (!avail) return;
+    // measure the line (or the widest row, for stacked titles) at 100px, then scale to the measure
+    const ms = el.dataset.fit === "rows" ? [...el.children] : [el];
+    el.style.fontSize = "100px";
+    const w = Math.max(...ms.map((m) => { m.style.width = "max-content"; const x = m.offsetWidth; m.style.width = ""; return x; }));
+    const max = el.dataset.fitMax ? (+el.dataset.fitMax * innerWidth) / 100 : Infinity;
+    el.style.fontSize = Math.min(max, ((100 * avail) / Math.max(w, 1)) * 0.995) + "px";
+    el.classList.add("is-fit");
+  }
+  const fitAll = (root = d) => $$("[data-fit]", root).forEach(fit);
+
+  /* ---------------- the canvas: layout and camera ---------------- */
+  const L = {};
+  const cam = { x: 0, y: 0, s: 1 };
+  function layout() {
+    const W = innerWidth, H = innerHeight, small = W < 900, g = Math.round(Math.max(W, H) * (small ? 0.13 : 0.1));
+    Object.assign(L, { W, H, g });
+    for (const [id, [c, r]] of Object.entries(GRID)) {
+      const b = boards[id];
+      b._x = c * (W + g); b._y = r * (H + g);
+      Object.assign(b.style, { left: b._x + "px", top: b._y + "px", width: W + "px", height: H + "px" });
+    }
+    const ww = 3 * W + 2 * g, wh = 3 * H + 2 * g;
+    const padT = small ? 84 : 110, padB = small ? 60 : 64, padX = small ? 12 : 64;
+    const s0 = Math.min((W - 2 * padX) / ww, (H - padT - padB) / wh);
+    L.s0 = s0;
+    L.ov = { s: s0, x: (W - ww * s0) / 2, y: padT + (H - padT - padB - wh * s0) / 2 };
+    L.ZR = touch ? H * 0.75 : 760;
+    html.style.setProperty("--s0", s0.toFixed(4));
+  }
+
+  // Z.v: 0 = inside the centre page, 1 = every page in view. The centre is the page you leave or enter.
+  const Z = { v: 0, t: 0, tw: null, center: "home" };
+  // the landing's own clock: scrolling first takes the day from afternoon to night, then pulls the camera back
+  const DAY = { v: 0, t: 0 };
+  function render() {
+    const e = Z.v, c = boards[Z.center];
+    cam.s = 1 + (L.s0 - 1) * e;
+    cam.x = -c._x + (L.ov.x + c._x) * e;
+    cam.y = -c._y + (L.ov.y + c._y) * e;
+    world.style.transform = `translate3d(${cam.x.toFixed(2)}px,${cam.y.toFixed(2)}px,0) scale(${cam.s.toFixed(5)})`;
+    world.style.setProperty("--k", e.toFixed(3));
+    world.style.setProperty("--kg", sstep(0.3, 0.75, e).toFixed(3));
+    const [cc, cr] = GRID[Z.center];
+    // the other pages dock into place as the camera pulls back
+    for (const [id, [col, row]] of Object.entries(GRID)) {
+      if (id === Z.center || reduce) continue;
+      const u = 1 - e, f = u * u * (3 - 2 * u), dx = col - cc, dy = row - cr;
+      if (f === 0 && boards[id]._f === 0) continue;
+      boards[id]._f = f;
+      gsap.set(boards[id], { x: dx * L.W * 0.4 * f, y: dy * L.H * 0.4 * f, rotationY: -dx * 24 * f, rotationX: dy * 20 * f });
+    }
+    const m = mode === "page" ? "page" : e > 0.001 ? "overview" : "focus";
+    if (m !== mode) setMode(m);
+    html.classList.toggle("is-zooming", e > 0.001 && e < 0.999);
+  }
+  const zto = (v, dur, ease) => new Promise((res) => {
+    if (Z.tw) Z.tw.kill();
+    Z.tw = gsap.to(Z, { v, duration: reduce ? 0 : dur, ease, onUpdate: render, onComplete: () => { Z.t = Z.v; Z.tw = null; render(); res(); } });
+  });
+
+  /* ---------------- state ---------------- */
+  let mode = "focus", current = "home", busy = false, pageCtx = null, caseOpen = null, topSince = 0;
+  function setMode(m) {
+    mode = m;
+    if (m !== "page") html.classList.remove("vc-off");
+    html.dataset.mode = m;
+    syncBar();
+    syncInert();
+  }
+  function setRoute(page) {
+    current = page;
+    html.dataset.route = page;
+    if (TITLES[page]) d.title = TITLES[page];
+    const suffix = page === "home" ? "" : `${page}/`;
+    $$(".langs a, .direct__langs a").forEach((a) => { const l = a.getAttribute("hreflang"); a.href = (l === "en" ? "/" : `/${l}/`) + suffix; });
+  }
+  const pathOf = (page, slug) => (page === "home" ? BASE : slug ? `${BASE}work/${slug}/` : `${BASE}${page}/`);
+  function parseRoute(p = location.pathname) {
+    const rest = p.startsWith(BASE) ? p.slice(BASE.length) : p.replace(/^\//, "");
+    const [a, b] = rest.split("/").filter(Boolean);
+    if (!a || !GRID[a] || isLocked(a)) return { page: "home" };
+    return a === "work" && b ? { page: "work", slug: b } : { page: a };
+  }
+  const allBtn = $(".bar__all"), allRoll = $(".btn__roll", allBtn);
+  function syncBar() {
+    const t = mode === "overview" ? allBtn.dataset.close : allBtn.dataset.open;
+    if (allRoll.textContent !== t) { allRoll.textContent = t; allRoll.dataset.text = t; }
+    allBtn.setAttribute("aria-expanded", String(mode === "overview"));
+  }
+  // only what you can see can take focus
+  function syncInert() {
+    for (const [id, b] of Object.entries(boards)) {
+      const v = view(id), hit = $(".board__hit", b);
+      v.inert = !(mode === "focus" && id === "home");
+      hit.tabIndex = mode === "overview" && !isLocked(id) ? 0 : -1;
+    }
+  }
+
+  /* ---------------- entering and leaving pages ---------------- */
+  function openPage(id) {
+    const v = view(id), page = v && $(".page", v);
+    if (!page) return;
+    const y = v.scrollTop;
+    host.appendChild(page);
+    v.scrollTop = 0;
+    setMode("page");
+    window.scrollTo(0, y);
+    if (lenis) { lenis.resize(); lenis.scrollTo(y, { immediate: true, force: true }); lenis.start(); }
+    topSince = performance.now();
+    requestAnimationFrame(vcardRoom);
+    pageCtx = gsap.context(() => { if (PAGE[id] && PAGE[id].init) PAGE[id].init(page); });
+    ScrollTrigger.refresh();
+  }
+  function closePage() {
+    const page = host.firstElementChild;
+    if (!page) return;
+    const y = window.scrollY;
+    if (pageCtx) { pageCtx.kill(); pageCtx = null; }
+    ScrollTrigger.getAll().forEach((t) => t.kill());
+    preview.hide();
+    view(current).appendChild(page);
+    if (lenis) lenis.stop();
+    mode = "focus";
+    window.scrollTo(0, 0);
+    view(current).scrollTop = y;
+  }
+  // while the camera moves, a page you left at its bottom rolls back to its top
+  function settle(id) {
+    const v = view(id);
+    if (v && v.scrollTop) gsap.to(v, { scrollTop: 0, duration: reduce ? 0 : 1.1, ease: "power3.inOut" });
+  }
+  function arrive(id, push = true, slug = null) {
+    setRoute(id);
+    if (id === "home") { mode = "focus"; setMode("focus"); } else openPage(id);
+    if (push && location.pathname !== pathOf(id, slug)) history.pushState({}, "", pathOf(id, slug));
+    if (slug) openCase(slug, false);
+  }
+  function unlift() {
+    Object.values(boards).filter((b) => gsap.getProperty(b, "scale") !== 1).forEach((b) => gsap.to(b, { scale: 1, z: 0, rotationX: 0, rotationY: 0, x: 0, y: 0, duration: 0.6, ease: "power3.out", overwrite: true }));
+  }
+
+  async function go(target, { push = true, slug = null } = {}) {
+    if (busy) return;
+    if (target === "overview" && mode === "overview") target = current;
+    busy = true;
+    cursor.hide();
+    html.classList.remove("bar-hidden");
+    if (caseOpen) closeCase(false);
+    if (mode === "page") {
+      if (target === current) {
+        busy = false;
+        if (slug) openCase(slug, push);
+        else if (lenis) lenis.scrollTo(0, { duration: 1.2 }); else window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const from = current;
+      closePage();
+      Z.center = from; Z.v = Z.t = 0; render();
+      settle(from);
+    }
+    if (Z.v >= 0.999) unlift();
+    html.classList.add("is-flying");
+    if (target === "overview") {
+      if (DAY.t < 1) gsap.to(DAY, { t: 1, v: 1, duration: reduce ? 0 : 1.1, ease: "power2.inOut" });
+      await zto(1, 1.15, "power3.inOut");
+      Z.center = "home";
+    } else {
+      let chained = false;
+      if (Z.center !== target) {
+        if (Z.v < 0.999) { chained = Z.v < 0.5; await zto(1, chained ? 0.75 : 0.45, chained ? "power2.in" : "power2.out"); }
+        Z.center = target;
+        render();
+      }
+      await zto(0, chained ? 1.05 : 1.1, chained ? "power3.out" : "power3.inOut");
+      arrive(target, push, slug);
+    }
+    html.classList.remove("is-flying");
+    busy = false;
+  }
+
+  /* ---------------- the pull: wheel and touch move the camera directly ---------------- */
+  let pullAcc = 0;
+  function pull(dy) {
+    if (busy || caseOpen || Z.tw) return;
+    if (mode === "page") {
+      if (window.scrollY > 1 || dy >= 0 || performance.now() - topSince < 350) { pullAcc = 0; return; }
+      pullAcc -= dy;
+      if (pullAcc < 70) return;
+      const from = current;
+      closePage();
+      Z.center = from; Z.v = 0; Z.t = clamp((pullAcc - 70) / L.ZR);
+      pullAcc = 0;
+      setMode("overview");
+      return;
+    }
+    if (Z.center === "home") {
+      // one scroll, two stretches: the day goes by first (0 → 1), then the camera pulls back (1 → 2)
+      const base = Z.t > 0 ? 1 + Z.t : DAY.t;
+      let u = base + dy / (L.ZR * (base < 1 || (dy < 0 && base <= 1) ? (hero.rain ? hero.rain.P.dayLength : 2.4) : 1));
+      if (reduce) u = dy > 0 ? (DAY.t < 1 ? 1 : 2) : Z.t > 0 ? 1 : 0;
+      u = Math.max(0, Math.min(2, u));
+      DAY.t = Math.min(1, u);
+      Z.t = Math.max(0, u - 1);
+      return;
+    }
+    const prev = Z.t;
+    Z.t = clamp(Z.t - dy / L.ZR);
+    if (reduce && Z.t !== prev) Z.t = Z.t > prev ? 1 : 0;
+  }
+  // the camera follows the pull with a little inertia; when it rests at either end, it arrives
+  function follow() {
+    const dd = DAY.t - DAY.v;
+    if (Math.abs(dd) > 0.0002) DAY.v += dd * (reduce ? 1 : 0.06); else DAY.v = DAY.t;
+    // whenever the pages are in view, it is night on the landing
+    if (Z.v > 0.02 && DAY.t < 1) DAY.t = 1;
+    if (hero.day) hero.day(DAY.v);
+    if (Z.tw || busy) return;
+    const dz = Z.t - Z.v;
+    if (Math.abs(dz) > 0.0004) { Z.v += dz * (reduce ? 1 : 0.13); render(); }
+    else if (Z.v !== Z.t) { Z.v = Z.t; render(); }
+    else if (Z.v === 0 && mode !== "page" && (Z.center !== "home" || current !== "home")) arrive(Z.center);
+    else if (Z.v === 1 && Z.center !== "home") { Z.center = "home"; render(); }
+  }
+  const norm = (e) => (e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY);
+  addEventListener("wheel", (e) => {
+    if (mode === "page" && current === "work" && !caseOpen && !busy && rail.wheel(norm(e) + e.deltaX)) return;
+    pull(norm(e));
+  }, { passive: true });
+  let ty = null;
+  addEventListener("touchstart", (e) => { ty = e.touches[0].clientY; }, { passive: true });
+  addEventListener("touchmove", (e) => {
+    if (ty === null) return;
+    const y = e.touches[0].clientY, dy = (ty - y) * 1.2;
+    ty = y;
+    if (hero.wiping && hero.wiping()) return;
+    pull(dy);
+  }, { passive: true });
+  addEventListener("touchend", () => { ty = null; }, { passive: true });
+  addEventListener("keydown", (e) => {
+    if (e.target.closest && e.target.closest("input, select, textarea")) return;
+    if (e.key === "Escape") { if (caseOpen) closeCase(); else if (mode === "page") go("overview"); else if (mode === "overview") go(current); return; }
+    if (mode === "page" && current === "work" && !caseOpen && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { rail.key(e.key === "ArrowRight" ? 1 : -1); return; }
+    if (mode === "focus" && ["ArrowDown", "PageDown", " "].includes(e.key)) { e.preventDefault(); go("overview"); }
+    else if (mode === "overview" && !busy && ["ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); go(current); }
+  });
+
+  /* ---------------- the card steps aside whenever big type needs the corner ---------------- */
+  const vcard = $("#vcard");
+  function vcardRoom() {
+    if (mode !== "page") { html.classList.remove("vc-off"); return; }
+    const r = vcard.getBoundingClientRect();
+    const hit = $$(".phero__title, .hello, .nextrow, .direct, .endline__txt", host).some((el) => {
+      const b = el.getBoundingClientRect();
+      return b.bottom > r.top - 8 && b.top < innerHeight && b.right > r.left;
+    });
+    html.classList.toggle("vc-off", hit);
+  }
+
+  /* ---------------- the bar steps aside while reading, returns on the way back ---------------- */
+  let lastY = 0;
+  addEventListener("scroll", () => {
+    const y = window.scrollY;
+    vcardRoom();
+    if (mode !== "page") { html.classList.remove("bar-hidden"); lastY = 0; return; }
+    if (y > 1) topSince = Infinity; else if (topSince === Infinity) topSince = performance.now();
+    if (y > 160 && y > lastY + 4) html.classList.add("bar-hidden");
+    else if (y < lastY - 4 || y < 160) html.classList.remove("bar-hidden");
+    lastY = y;
+  }, { passive: true });
+
+  /* ---------------- clicks ---------------- */
+  d.addEventListener("click", (e) => {
+    const cp = e.target.closest("[data-copy]");
+    if (cp) { copy(cp); return; }
+    const a = e.target.closest("[data-go], [data-case], [data-close-case]");
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button > 0) return;
+    e.preventDefault();
+    if (a.hasAttribute("data-close-case")) { closeCase(); return; }
+    if (a.dataset.case) {
+      if (mode === "page" && current === "work") openCase(a.dataset.case);
+      else go("work", { slug: a.dataset.case });
+      return;
+    }
+    if (a.dataset.need) form.setNeed(a.dataset.need);
+    if (isLocked(a.dataset.go)) { const b = boards[a.dataset.go]; if (!reduce) gsap.fromTo(b, { x: -8 }, { x: 0, duration: 0.6, ease: "elastic.out(1, 0.3)" }); return; }
+    go(a.dataset.go);
+  });
+  addEventListener("popstate", () => {
+    const r = parseRoute();
+    if (caseOpen && !r.slug) closeCase(false);
+    if (r.page !== current || mode !== "page" && r.page !== "home" || mode === "overview") go(r.page, { push: false, slug: r.slug });
+    else if (r.slug) openCase(r.slug, false);
+  });
+  function copy(btn) {
+    const em = $("em", btn), old = em.textContent;
+    const done = () => { em.textContent = btn.dataset.copied; setTimeout(() => (em.textContent = old), 1800); };
+    if (navigator.clipboard) navigator.clipboard.writeText(btn.dataset.copy).then(done, () => (location.href = "mailto:" + btn.dataset.copy));
+    else location.href = "mailto:" + btn.dataset.copy;
+  }
+
+  /* ---------------- cursor label and board lift (overview) ---------------- */
+  const cursor = (() => {
+    const el = $(".cursor"), label = $(".cursor__label");
+    const x = gsap.quickTo(el, "x", { duration: 0.45, ease: "power3" }), y = gsap.quickTo(el, "y", { duration: 0.45, ease: "power3" });
+    addEventListener("pointermove", (e) => { x(e.clientX); y(e.clientY); }, { passive: true });
+    return { show: (t) => { label.textContent = t; el.classList.add("is-on"); }, hide: () => el.classList.remove("is-on") };
+  })();
+  for (const [id, b] of Object.entries(boards)) {
+    const hit = $(".board__hit", b), name = b.dataset.soon || $(".board__label b", b).textContent;
+    const still = () => busy || touch || Z.v < 0.999 || Z.tw;
+    hit.addEventListener("pointerenter", () => { if (!still()) { cursor.show(name); gsap.to(b, { scale: 1.03, z: 60, duration: 0.8, ease: "power3.out", overwrite: "auto" }); } });
+    hit.addEventListener("pointermove", (e) => {
+      if (still()) return;
+      const r = hit.getBoundingClientRect();
+      gsap.to(b, { rotationX: ((e.clientY - r.top) / r.height - 0.5) * -6, rotationY: ((e.clientX - r.left) / r.width - 0.5) * 8, duration: 0.8, ease: "power3.out", overwrite: "auto" });
+    });
+    hit.addEventListener("pointerleave", () => { cursor.hide(); if (!busy && Z.v >= 0.999) gsap.to(b, { scale: 1, z: 0, rotationX: 0, rotationY: 0, duration: 0.8, ease: "power3.out", overwrite: "auto" }); });
+  }
+
+  /* ---------------- home: a window on a rainy day ---------------- */
+  const hero = (() => {
+    const c = $(".hero__rain"), el = $(".hero"), tip = $(".touch");
+    if (!c || !window.Rain || !Rain.supported) return {};
+    const rain = new Rain(c, { img: c.dataset.img, mask: c.dataset.mask, reduce });
+    const live = () => mode !== "page" && !busy;
+    const tx = gsap.quickTo(tip, "x", { duration: 0.2, ease: "power3" }), ty = gsap.quickTo(tip, "y", { duration: 0.2, ease: "power3" });
+    // a mouse: press and drag to wipe the glass
+    el.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "mouse" || e.button || !live() || mode !== "focus") return;
+      if (rain.down(e.clientX, e.clientY)) tip.classList.add("is-down");
+    });
+    addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "mouse" || !live()) return;
+      rain.move(e.clientX, e.clientY);
+      tip.classList.toggle("is-on", mode === "focus" && !!e.target.closest(".hero"));
+      tx(e.clientX); ty(e.clientY);
+    }, { passive: true });
+    addEventListener("pointerup", () => { rain.up(); tip.classList.remove("is-down"); });
+    el.addEventListener("pointerleave", () => { rain.up(); tip.classList.remove("is-on", "is-down"); });
+    // a finger: rest it on the glass for a moment, then drag; a quick flick still scrolls
+    let hold = null, wiping = false;
+    el.addEventListener("touchstart", (e) => {
+      if (!live() || mode !== "focus") return;
+      const t0 = e.touches[0];
+      clearTimeout(hold);
+      hold = setTimeout(() => { wiping = rain.down(t0.clientX, t0.clientY); }, 170);
+    }, { passive: true });
+    el.addEventListener("touchmove", (e) => { const t0 = e.touches[0]; if (wiping) rain.move(t0.clientX, t0.clientY); else clearTimeout(hold); }, { passive: true });
+    el.addEventListener("touchend", () => { clearTimeout(hold); wiping = false; rain.up(); }, { passive: true });
+    // the light: afternoon when you arrive; scrolling brings the sunset, then the night
+    const label = $(".hero__sky"), words = label ? JSON.parse(label.dataset.labels) : {};
+    // six moments of light, from a cool 7 a.m. to midnight, blended smoothly as you scroll
+    const KEYS = [
+      { at: 0, h: 7, sat: 0.72, bright: 0.66, contrast: 0.9, tint: [0.93, 0.98, 1.06], lift: [0.03, 0.035, 0.042], glow: [0.07, 0.05, 0.035], night: 0 },
+      { at: 0.2, h: 12, sat: 0.9, bright: 0.86, contrast: 1.04, tint: [1, 1, 0.99], lift: [0.012, 0.012, 0.012], glow: [0, 0, 0], night: 0 },
+      { at: 0.42, h: 16, sat: 0.92, bright: 0.8, contrast: 1.03, tint: [1.06, 1, 0.9], lift: [0.012, 0.01, 0.006], glow: [0.05, 0.035, 0.012], night: 0 },
+      { at: 0.62, h: 19, sat: 0.98, bright: 0.72, contrast: 1.1, tint: [1.24, 0.86, 0.62], lift: [0.02, 0.008, 0], glow: [0.2, 0.08, 0.02], night: 0 },
+      { at: 0.81, h: 21, sat: 0.62, bright: 0.36, contrast: 0.96, tint: [0.64, 0.72, 1.02], lift: [0.004, 0.008, 0.022], glow: [0.02, 0.012, 0.035], night: 0.6 },
+      { at: 1, h: 24, sat: 0.5, bright: 0.14, contrast: 1, tint: [0.56, 0.68, 1], lift: [0.002, 0.004, 0.011], glow: [0, 0, 0], night: 1 },
+    ];
+    const lerp = (a, b, t) => (Array.isArray(a) ? a.map((v, i) => v + (b[i] - v) * t) : a + (b - a) * t);
+    let lastLabel = "";
+    const day = (d) => {
+      let i = 0;
+      while (i < KEYS.length - 2 && d > KEYS[i + 1].at) i++;
+      const A = KEYS[i], B = KEYS[i + 1], u = Math.min(1, Math.max(0, (d - A.at) / (B.at - A.at))), t = u * u * (3 - 2 * u);
+      const g = rain.state.grade;
+      for (const k of ["sat", "bright", "contrast", "tint", "lift", "glow"]) g[k] = lerp(A[k], B[k], t);
+      rain.state.night = lerp(A.night, B.night, t);
+      if (!label) return;
+      const min = Math.round((A.h + (B.h - A.h) * u) * 60) % 1440, hh = Math.floor(min / 60), text = `${String(hh).padStart(2, "0")}:${String(min % 60).padStart(2, "0")} · ${rain.state.storm > 0.5 ? words.storm : hh < 10 && hh >= 5 ? words.morning : hh < 14 && hh >= 5 ? words.noon : hh < 18 && hh >= 5 ? words.afternoon : hh < 20 && hh >= 5 ? words.sunset : hh < 22 && hh >= 5 ? words.evening : words.night}`;
+      if (text !== lastLabel) { label.textContent = text; lastLabel = text; }
+    };
+    day(0);
+    // if there is a real storm where the visitor is, it storms here too
+    const strike = () => {
+      if (rain.state.storm > 0.5 && mode !== "page" && !reduce)
+        gsap.timeline().to(rain.state, { flash: 0.9, duration: 0.05 }).to(rain.state, { flash: 0.12, duration: 0.09 }).to(rain.state, { flash: 0.7, duration: 0.05 }).to(rain.state, { flash: 0, duration: 0.9, ease: "power2.out" });
+      gsap.delayedCall(6 + Math.random() * 14, strike);
+    };
+    const q = new URLSearchParams(location.search);
+    const setStorm = (v) => gsap.to(rain.state, { storm: v, duration: 4, ease: "sine.inOut" });
+    if (q.get("sky") === "storm") setStorm(1);
+    else if (window.Sky) { const L = Sky.light(new Date()); Sky.weather(L.lat, L.lon).then((w) => w.storm && setStorm(w.storm)); }
+    gsap.delayedCall(5, strike);
+    // ?tune opens the live settings panel
+    if (q.has("tune")) {
+      try { const st = JSON.parse(localStorage.getItem("pp-rain-tune-2") || "null"); if (st) Object.assign(rain.P, st); } catch (e) {}
+      import("/assets/js/tune.js").then((m) => m.tune(rain, (mode) => {
+        const at = typeof mode === "number" ? mode : { dawn: 0, day: 0.2, dusk: 0.62, night: 1 }[mode];
+        if (at !== undefined) { DAY.t = DAY.v = at; }
+        if (typeof mode !== "number") setStorm(mode === "storm" ? 1 : 0);
+      }));
+      window.rain = rain;
+    }
+
+    // a hidden one: type "sun" (or "sol") and the rain stops for a while
+    let keys = "";
+    addEventListener("keydown", (e) => {
+      if (mode === "page" || e.key.length !== 1) return;
+      keys = (keys + e.key.toLowerCase()).slice(-3);
+      if (keys === "sun" || keys.endsWith("sol")) {
+        keys = "";
+        gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 4, ease: "sine.inOut" }, "+=9");
+      }
+    });
+    return { rain, day, wiping: () => wiping };
+  })();
+
+  /* ---------------- the preview that follows the pointer over lists ---------------- */
+  const preview = (() => {
+    const box = $(".preview"), c = $(".preview__fx");
+    const rows = $$(".irow[data-img], .drow[data-img]");
+    if (!FXOK || touch || !box || !rows.length) return { hide() {} };
+    const srcs = [...new Set(rows.map((r) => r.dataset.img))];
+    let fx = null, on = false;
+    const x = gsap.quickTo(box, "x", { duration: 0.7, ease: "power3" }), y = gsap.quickTo(box, "y", { duration: 0.7, ease: "power3" });
+    let row = null;
+    const place = (e, jump) => {
+      const w = box.offsetWidth, h = box.offsetHeight;
+      // stay clear of the row's text: between the name and the columns on the right
+      const avoid = row && $(".irow__c, .drow__text", row);
+      const limit = avoid && avoid.offsetParent ? avoid.getBoundingClientRect().left - w - 20 : innerWidth - w - 14;
+      const px = Math.max(14, Math.min(e.clientX + 32, limit)), py = Math.max(14, Math.min(e.clientY - h / 2, innerHeight - h - 14));
+      if (jump) gsap.set(box, { x: px, y: py }); x(px); y(py);
+    };
+    rows.forEach((r) => {
+      r.addEventListener("pointerenter", (e) => {
+        if (mode !== "page") return;
+        row = r;
+        if (!fx) fx = new FX(c, { srcs, pix: 3, contrast: 1.3, dpr: 1.25 });
+        fx.show(srcs.indexOf(r.dataset.img), on ? 0.7 : 0);
+        fx.set("clean", 0);
+        gsap.to(fx.state, { clean: 1, duration: 1.1, delay: 0.15, ease: "power2.inOut", overwrite: true });
+        place(e, !on);
+        on = true;
+        box.classList.add("is-on");
+      });
+      r.addEventListener("pointermove", (e) => on && place(e));
+      r.addEventListener("pointerleave", (e) => { if (!e.relatedTarget || !e.relatedTarget.closest("[data-img]")) hide(); });
+    });
+    const hide = () => { on = false; box.classList.remove("is-on"); };
+    let lx = 0, ly = 0;
+    addEventListener("pointermove", (e) => { lx = e.clientX; ly = e.clientY; }, { passive: true });
+    // while the page glides under a still pointer, keep the picture only if the pointer is still on its row
+    addEventListener("scroll", () => { if (on && !(d.elementFromPoint(lx, ly) || { closest: () => null }).closest("[data-img]")) hide(); }, { passive: true });
+    return { hide };
+  })();
+
+  /* ---------------- pictures develop when they come into view ---------------- */
+  const tileIO = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    const t = e.target, hi = $(".tile__hi", t);
+    const reveal = () => setTimeout(() => t.classList.add("is-on"), (+t.dataset.delay || 0) * 1000);
+    if (hi.dataset.src && !hi.getAttribute("src")) { hi.addEventListener("load", reveal, { once: true }); hi.src = hi.dataset.src; }
+    else if (hi.complete && hi.naturalWidth) reveal(); else hi.addEventListener("load", reveal, { once: true });
+    tileIO.unobserve(t);
+  }), { rootMargin: "0px 0px -8% 0px" });
+  $$(".strip .tile").forEach((t, i) => (t.dataset.delay = (i * 0.08).toFixed(2)));
+  $$(".tile").forEach((t) => tileIO.observe(t));
+
+  /* ---------------- pages ---------------- */
+  const words = (el) => el._split || (el._split = SplitText.create(el, { type: "words" }));
+  const scrubWords = (el, trigger) => gsap.fromTo(words(el).words, { opacity: 0.14 }, { opacity: 1, stagger: 0.1, ease: "none", scrollTrigger: { trigger: trigger || el, start: "top 75%", end: "bottom 55%", scrub: 0.6 } });
+  const lines = (el) => el._lines || (el._lines = SplitText.create(el, { type: "lines", mask: "lines", linesClass: "ln" }));
+  // lines are split when they are about to show, so they always break with the real face at the real width
+  const riseLines = (el, start = "top 82%") => {
+    if (!el) return;
+    if (!el._lines) gsap.set(el, { clipPath: "inset(0 0 100% 0)" });
+    ScrollTrigger.create({ trigger: el, start, once: true, onEnter: () => {
+      if (el._lines) { el._lines.revert(); el._lines = null; }
+      gsap.set(el, { clipPath: "none" });
+      gsap.from(lines(el).lines, { yPercent: 105, duration: 1.2, ease: EO, stagger: 0.08 });
+    } });
+  };
+
+  /* ---------------- work: a rail of projects you move with the wheel, a drag or a swipe ---------------- */
+  const rail = (() => {
+    const el = $(".wk__rail");
+    if (!el) return { wheel: () => false, layout() {}, key() {} };
+    const items = $$(".wk__item", el), pics = items.map((i) => $(".wk__img img", i));
+    const count = $(".wk__count b"), bar = $(".wk__bar");
+    let target = 0, driving = false, drag = null, dragged = false;
+    const max = () => Math.max(0, el.scrollWidth - el.clientWidth);
+    function layout() {
+      const cap = ($(".wk__cap", el) || { offsetHeight: 24 }).offsetHeight + 10;
+      const pad = parseFloat(getComputedStyle(el).paddingTop) || 0;
+      el.style.setProperty("--ih", Math.max(140, el.clientHeight - pad - cap) + "px");
+      target = el.scrollLeft;
+      update();
+    }
+    function update() {
+      const m = max(), p = m ? el.scrollLeft / m : 0, frac = el.scrollWidth ? el.clientWidth / el.scrollWidth : 1;
+      bar.style.setProperty("--tw", (frac * 100).toFixed(2) + "%");
+      bar.style.setProperty("--tx", ((p * (1 - frac)) / frac * 100).toFixed(2) + "%");
+      const n = Math.round(p * (items.length - 1)) + 1;
+      if (count.textContent !== String(n).padStart(2, "0")) count.textContent = String(n).padStart(2, "0");
+      // each picture drifts a little inside its frame, so the rail has depth
+      if (reduce) return;
+      const r = el.getBoundingClientRect(), mid = r.left + r.width / 2;
+      items.forEach((it, i) => {
+        const b = it.getBoundingClientRect(), off = (b.left + b.width / 2 - mid) / r.width;
+        pics[i].style.transform = `translateX(${(off * -9).toFixed(2)}%)`;
+      });
+    }
+    el.addEventListener("scroll", () => { if (!driving) target = el.scrollLeft; update(); }, { passive: true });
+    // the title above fits itself to the width, so the rail's height is only known after it
+    new ResizeObserver(() => layout()).observe(el);
+    gsap.ticker.add(() => {
+      if (!driving) return;
+      const d = target - el.scrollLeft;
+      if (Math.abs(d) < 0.5) { el.scrollLeft = target; driving = false; return; }
+      el.scrollLeft += d * (reduce ? 1 : 0.1);
+    });
+    const go = (t) => { target = gsap.utils.clamp(0, max(), t); driving = true; };
+    // the wheel moves the rail; at its start, scrolling up hands over to the camera
+    const wheel = (dy) => {
+      if (dy < 0 && target <= 0.5 && el.scrollLeft <= 1) return false;
+      go(target + dy);
+      return true;
+    };
+    const key = (dir) => go(target + dir * (items[0].offsetWidth + 14));
+    el.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "mouse" || e.button) return;
+      drag = { x: e.clientX, t: target }; dragged = false;
+    });
+    addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      if (Math.abs(dx) > 5) { dragged = true; el.classList.add("is-drag"); cursor.hide(); }
+      if (dragged) go(drag.t - dx * 1.4);
+    });
+    addEventListener("pointerup", () => { drag = null; el.classList.remove("is-drag"); });
+    el.addEventListener("click", (e) => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
+    items.forEach((it) => {
+      const link = $(".wk__link", it);
+      link.addEventListener("pointerenter", () => { if (!touch && mode === "page" && !drag) cursor.show(link.closest(".page").dataset.open || ""); });
+      link.addEventListener("pointerleave", () => cursor.hide());
+    });
+    return { wheel, layout, key };
+  })();
+
+  const PAGE = {
+    work: {
+      init() { rail.layout(); },
+    },
+    about: {
+      init(page) {
+        const dev = $(".dev", page), c = $(".dev__fx", page);
+        if (FXOK && c && !c._fx) c._fx = new FX(c, { srcs: [c.dataset.src], pix: reduce ? 2 : 16, clean: reduce ? 1 : 0, contrast: 1.2, grain: 0.03 });
+        if (reduce) return;
+        scrubWords($(".say__text", page), $(".say", page));
+        $$(".chip", page).forEach((ch) => gsap.fromTo(ch, { clipPath: "inset(0% 50% 0% 50%)" }, { clipPath: "inset(0% 0% 0% 0%)", ease: "none", scrollTrigger: { trigger: ch, start: "top 85%", end: "top 62%", scrub: 0.6 } }));
+        // the portrait is printed coarse and develops into the photograph as you read
+        if (c && c._fx) {
+          const fx = c._fx;
+          ScrollTrigger.create({ trigger: dev, start: "top 70%", end: "bottom bottom", scrub: 0.8, onUpdate: (s) => { fx.set("pix", 16 - 14 * sstep(0, 0.7, s.progress)); fx.set("clean", sstep(0.45, 0.95, s.progress)); } });
+        }
+        $$(".truth__big", page).forEach((el) => riseLines(el));
+        riseLines($(".dev__proof", page));
+      },
+    },
+    services: {
+      init(page) {
+        if (reduce) return;
+        scrubWords($(".how__text", page), $(".how", page));
+      },
+    },
+    contact: {
+      init(page) {
+        form.resize();
+        if (reduce) return;
+        gsap.from($$(".madlib__text > .mk > span", page), { yPercent: 118, duration: 1.15, ease: EO, stagger: 0.04, scrollTrigger: { trigger: $(".madlib", page), start: "top 78%", once: true } });
+      },
+    },
+  };
+
+  /* ---------------- questions open like drawers ---------------- */
+  $$(".qrow__head").forEach((b) => b.addEventListener("click", () => {
+    const open = b.getAttribute("aria-expanded") !== "true", body = b.nextElementSibling;
+    b.setAttribute("aria-expanded", String(open));
+    gsap.to(body, { height: open ? "auto" : 0, duration: reduce ? 0 : 0.7, ease: "power3.inOut", onComplete: () => ScrollTrigger.refresh() });
+  }));
+
+  /* ---------------- the business card: tilts toward you, turns over when touched ---------------- */
+  (() => {
+    const card = $(".bcard");
+    if (!card) return;
+    const wrap = card.closest(".phero");
+    card.addEventListener("click", () => card.classList.toggle("is-flipped"));
+    if (touch || reduce) return;
+    const rx = gsap.quickTo(card, "rotationX", { duration: 0.9, ease: "power3" }), ry = gsap.quickTo(card, "rotationY", { duration: 0.9, ease: "power3" });
+    wrap.addEventListener("pointermove", (e) => {
+      if (mode !== "page") return;
+      const r = card.getBoundingClientRect();
+      rx(gsap.utils.clamp(-1, 1, (e.clientY - (r.top + r.height / 2)) / (innerHeight / 2)) * -12);
+      ry(gsap.utils.clamp(-1, 1, (e.clientX - (r.left + r.width / 2)) / (innerWidth / 2)) * 16);
+    });
+    wrap.addEventListener("pointerleave", () => { rx(0); ry(0); });
+  })();
+
+  /* ---------------- case studies ---------------- */
+  function openCase(slug, push = true) {
+    const art = $(`.case[data-slug="${slug}"]`);
+    if (!art) return;
+    const wrap = $("#cases");
+    if (caseOpen && caseOpen !== art) caseOpen.hidden = true;
+    wrap.hidden = false; art.hidden = false; art.scrollTop = 0;
+    caseOpen = art;
+    html.setAttribute("data-case-open", "");
+    preview.hide();
+    if (lenis) lenis.stop();
+    fitAll(art);
+    if (!reduce) gsap.fromTo($(".case__poster", art), { scale: 1.12 }, { scale: 1, duration: 2.2, ease: EO, delay: 0.2 });
+    gsap.fromTo(art, { clipPath: "inset(100% 0% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: reduce ? 0 : 1.1, ease: "power4.inOut" });
+    if (!reduce) gsap.fromTo($(".case__title", art), { yPercent: 40 }, { yPercent: 0, duration: 1.6, ease: EO, delay: 0.35 });
+    $$(".tile", art).forEach((t) => tileIO.observe(t));
+    if (TITLES.cases && TITLES.cases[slug]) d.title = TITLES.cases[slug];
+    if (push) history.pushState({}, "", pathOf("work", slug));
+    $(".case__close", art).focus({ preventScroll: true, focusVisible: false });
+  }
+  function closeCase(push = true) {
+    if (!caseOpen) return;
+    const art = caseOpen;
+    caseOpen = null;
+    html.removeAttribute("data-case-open");
+    gsap.to(art, { clipPath: "inset(0% 0% 100% 0%)", duration: reduce ? 0 : 0.8, ease: "power3.inOut", onComplete: () => { art.hidden = true; $("#cases").hidden = true; gsap.set(art, { clearProps: "clipPath" }); } });
+    if (lenis && mode === "page") lenis.start();
+    if (TITLES[current]) d.title = TITLES[current];
+    if (push) history.pushState({}, "", pathOf(current));
+  }
+
+  /* ---------------- the sentence form ---------------- */
+  const form = (() => {
+    const f = $("#form");
+    if (!f) return { setNeed() {}, resize() {} };
+    const ctx = d.createElement("canvas").getContext("2d");
+    const fields = $$("input", f), select = $("select", f);
+    const size = (el) => {
+      const cs = getComputedStyle(el);
+      ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const txt = el.tagName === "SELECT" ? el.options[el.selectedIndex].text : el.value || el.placeholder;
+      const fs = parseFloat(cs.fontSize), track = parseFloat(cs.letterSpacing) || 0;
+      el.style.width = Math.ceil(ctx.measureText(txt).width + track * txt.length + fs * (el.tagName === "SELECT" ? 1.2 : 0.1)) + "px";
+    };
+    const resize = () => [...fields, select].forEach(size);
+    fields.forEach((i) => i.addEventListener("input", () => { size(i); i.closest(".slot").classList.remove("is-invalid"); $(".madlib__error", f).textContent = ""; }));
+    select.addEventListener("change", () => size(select));
+    (d.fonts ? d.fonts.ready : Promise.resolve()).then(resize);
+    addEventListener("resize", resize);
+    const check = () => {
+      const bad = [];
+      for (const i of fields) {
+        const v = i.value.trim();
+        const ok = i.type === "email" ? /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) : v.length > 1;
+        i.closest(".slot").classList.toggle("is-invalid", !ok);
+        i.setAttribute("aria-invalid", String(!ok));
+        if (!ok) bad.push(i);
+      }
+      return bad;
+    };
+    const done = (title, text) => {
+      const box = $(".done", f.parentElement);
+      $(".done__title", box).textContent = title;
+      $(".done__text", box).textContent = text;
+      f.hidden = true; box.hidden = false; box.focus({ preventScroll: true });
+      if (!reduce) gsap.from(box.children, { yPercent: 50, clipPath: "inset(0 0 100% 0)", duration: 1.2, ease: EO, stagger: 0.08 });
+      ScrollTrigger.refresh();
+    };
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const bad = check(), err = $(".madlib__error", f);
+      if (bad.length) { err.textContent = f.dataset["err" + bad[0].name[0].toUpperCase() + bad[0].name.slice(1)]; bad[0].focus(); return; }
+      const data = Object.fromEntries(new FormData(f));
+      data.needLabel = select.options[select.selectedIndex].text;
+      data.language = LANG;
+      const sentence = [...$(".madlib__text", f).childNodes].map((n) => {
+        const inps = n.querySelectorAll ? [...n.querySelectorAll("input, select")] : [];
+        if (!inps.length) return n.textContent;
+        return [...n.firstElementChild.childNodes].map((c) => {
+          const inp = c.querySelector ? c.querySelector("input, select") : null;
+          return inp ? (inp.tagName === "SELECT" ? data.needLabel : inp.value.trim()) : c.textContent;
+        }).join("");
+      }).join("").replace(/\s+/g, " ").trim();
+      data.sentence = sentence;
+      if (f.dataset.endpoint) {
+        const b = $("button[type=submit]", f), roll = $(".btn__roll", b), old = roll.textContent;
+        b.disabled = true; roll.textContent = roll.dataset.text = f.dataset.sending;
+        try {
+          const r = await fetch(f.dataset.endpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(data) });
+          if (!r.ok) throw new Error(r.status);
+          done(f.dataset.okTitle, f.dataset.okText);
+        } catch (x) { err.textContent = f.dataset.errSend; b.disabled = false; roll.textContent = roll.dataset.text = old; }
+      } else {
+        location.href = `mailto:${f.dataset.email}?subject=${encodeURIComponent(`${f.dataset.subject}: ${data.business}`)}&body=${encodeURIComponent(sentence)}`;
+        done(f.dataset.mailtoTitle, f.dataset.mailtoText);
+      }
+    });
+    return { setNeed: (id) => { select.value = id; size(select); }, resize };
+  })();
+
+  /* ---------------- home intro: the light comes up behind the glass, the rain starts, then the name ---------------- */
+  function intro() {
+    const shown = () => gsap.set("[data-intro]", { visibility: "visible" });
+    const rain = hero.rain;
+    if (reduce) { shown(); if (rain) rain.set("expo", 1); return; }
+    let seen = false;
+    try { seen = !!sessionStorage.getItem("pp-seen"); sessionStorage.setItem("pp-seen", "1"); } catch (e) {}
+    const k = seen ? 0.6 : 1;
+    shown();
+    const tl = gsap.timeline({ delay: 0.15 });
+    if (rain) {
+      rain.set("rain", 0.2);
+      tl.to(rain.state, { expo: 1, duration: 2.6 * k, ease: "power2.out" }, 0)
+        .to(rain.state, { rain: 1, duration: 3, ease: "sine.in" }, 0.4 * k);
+    }
+    tl.fromTo(".hero__logo", { clipPath: "inset(0% 0% 100% 0%)", yPercent: 30 }, { clipPath: "inset(0% 0% 0% 0%)", yPercent: 0, duration: 1.6 * k, ease: EO }, 1.0 * k);
+    const split = SplitText.create(".hero__line", { type: "lines", mask: "lines" });
+    tl.from(split.lines, { yPercent: 110, duration: 1.3, ease: EO, stagger: 0.07 }, 1.35 * k)
+      .from(".bar__all", { yPercent: -140, duration: 1.2, ease: EO }, 1.5 * k)
+      .from(".vcard", { yPercent: 130, duration: 1.4, ease: EO }, 1.6 * k);
+  }
+
+  /* ---------------- start ---------------- */
+  layout();
+  const r0 = parseRoute();
+  Z.center = r0.page;
+  render();
+  setRoute(r0.page);
+  for (const id of Object.keys(PAGE)) { const p = $(".page", view(id)); if (p && PAGE[id].preview) PAGE[id].preview(p); }
+  if (r0.page === "home") setMode("focus");
+  html.classList.add("ready");
+  gsap.ticker.add(() => {
+    follow();
+    const now = performance.now();
+    if (hero.rain) { hero.rain.active = mode !== "page"; hero.rain.tick(now); }
+    if (FXOK) FX.tick(now);
+  });
+  const fontsReady = Promise.race([d.fonts ? d.fonts.ready : Promise.resolve(), new Promise((res) => setTimeout(res, 1600))]);
+  fontsReady.then(() => {
+    // pages split their lines only once the real faces are in
+    if (r0.page !== "home") openPage(r0.page);
+    fitAll();
+    if (r0.page === "home") intro(); else { gsap.set("[data-intro]", { visibility: "visible" }); if (hero.rain) hero.rain.set("expo", 1); }
+    if (r0.slug) openCase(r0.slug, false);
+    ScrollTrigger.refresh();
+  });
+
+  // a face that arrives late re-fits the titles
+  if (d.fonts) d.fonts.addEventListener("loadingdone", () => { fitAll(); form.resize(); });
+
+  let rt;
+  addEventListener("resize", () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => {
+      layout();
+      render();
+      fitAll();
+      rail.layout();
+      if (mode === "page") ScrollTrigger.refresh();
+    }, 120);
+  });
+
+  console.log("%cPol Planas", "font: 800 20px sans-serif", "\nDesigned and built by hand. pol@polplanas.com");
+})();
