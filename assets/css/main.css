@@ -530,3 +530,5 @@ html:not([data-mode="focus"]) .voice { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .bcard__inner, .tile__hi, .vcard__avail::before { transition: none; animation: none; }
 }
+/* once the live window has drawn, the blurred poster beneath it is never seen: stop painting it */
+.hero:has(.hero__rain.is-ready) .hero__poster { visibility: hidden; }

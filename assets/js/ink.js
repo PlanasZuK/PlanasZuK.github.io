@@ -71,13 +71,17 @@
       const ask = async (app, language, extra = {}) => {
         try {
           const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 4000);
-          const r = await fetch(`https://inputtools.google.com/request?ime=handwriting&app=${app}&cs=1&oe=UTF-8`, {
+          const r = await fetch(`https://inputtools.google.com/request?ime=handwriting&app=${app}${app === "autodraw" ? "&dbg=1" : ""}&cs=1&oe=UTF-8`, {
             method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ...extra, requests: [{ writing_guide: { writing_area_width: Math.round(w + 40), writing_area_height: Math.round(h + 40) }, ink, language, max_num_results: 10 }] }),
           });
           clearTimeout(t);
           const j = await r.json();
-          return j[0] === "SUCCESS" ? j[1][0][1] : [];
+          if (j[0] !== "SUCCESS") return [];
+          // the drawing recogniser also says how far each guess is from the strokes (lower is surer)
+          const dbg = j[1][0][3] && /SCORESINKS: (\[.*?\]\])/.exec(j[1][0][3].debug_info || "");
+          if (app === "autodraw") { try { if (dbg) return JSON.parse(dbg[1]).map(([l, s]) => ({ l, s })); } catch (e) {} return j[1][0][1].map((l, i) => ({ l, s: 2.5 + i })); }
+          return j[1][0][1];
         } catch (e) { return []; }
       };
       try {

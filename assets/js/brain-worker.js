@@ -21,15 +21,17 @@ self.onmessage = async (e) => {
           self.postMessage({ type: "progress", value: b ? a / b : 0 });
         },
       });
-      // a first tiny answer compiles the graphics-card programs, so the first real one is quick
-      await gen([{ role: "user", content: "hi" }], { max_new_tokens: 4 });
+      // a first answer, as long as a real conversation, compiles the graphics-card programs for that size,
+      // so the visitor's first real question is answered quickly (this happens under the loading screen)
+      const brief = "You are the voice of a web designer's website. Answer in one short, witty sentence. ".repeat(14);
+      await gen([{ role: "system", content: brief }, { role: "user", content: "chips" }, { role: "assistant", content: "Chips? If you sell them, I will make you a crunchy website." }, { role: "user", content: "hello there" }], { max_new_tokens: 12 });
       self.postMessage({ type: "ready" });
     } catch (err) { self.postMessage({ type: "error", message: String(err && err.message || err) }); }
   }
   if (type === "ask") {
     if (!gen) { self.postMessage({ type: "answer", id, text: "" }); return; }
     try {
-      const r = await gen(messages, { max_new_tokens: 36, do_sample: true, temperature: e.data.temperature || 0.7, top_p: 0.9, repetition_penalty: 1.1 });
+      const r = await gen(messages, { max_new_tokens: 48, do_sample: true, temperature: e.data.temperature || 0.7, top_p: 0.92, repetition_penalty: 1.15 });
       self.postMessage({ type: "answer", id, text: r[0].generated_text.at(-1).content || "" });
     } catch (err) { self.postMessage({ type: "answer", id, text: "" }); }
   }
