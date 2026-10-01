@@ -801,15 +801,15 @@
   })();
 
   /* ---------------- home intro: the light comes up behind the glass, the rain starts, then the name ---------------- */
-  function intro(logoDone = false) {
+  function intro(logoDone = false, paused = false) {
     const shown = () => gsap.set("[data-intro]", { visibility: "visible" });
     const rain = hero.rain;
-    if (reduce) { shown(); if (rain) rain.set("expo", 1); return; }
+    if (reduce) { shown(); if (rain) rain.set("expo", 1); return null; }
     let seen = false;
     try { seen = !!sessionStorage.getItem("pp-seen"); sessionStorage.setItem("pp-seen", "1"); } catch (e) {}
     const k = seen ? 0.6 : 1;
     shown();
-    const tl = gsap.timeline({ delay: 0.15 });
+    const tl = gsap.timeline({ delay: paused ? 0 : 0.15, paused });
     if (rain) {
       rain.set("rain", 0.2);
       tl.to(rain.state, { expo: 1, duration: 2.6 * k, ease: "power2.out" }, 0)
@@ -836,47 +836,49 @@
       .from(".vcard", { yPercent: 130, duration: 1.4, ease: EO }, at + 0.3);
     // whatever happens during the intro, it always ends complete
     tl.eventCallback("onInterrupt", () => tl.progress(1));
+    return tl;
   }
 
   /* ---------------- loading: the logo fills with water as the window and the voice get ready ---------------- */
-  function load() {
+  function load(introTl) {
     const el = $("#loader");
     if (!el) return Promise.resolve(false);
     return new Promise((done) => {
-      const trace = $(".loader__trace", el), wave = $(".loader__wave", el), pct = $(".loader__pct", el), skip = $(".loader__skip", el);
+      const trace = $(".loader__trace", el), fill = $(".loader__fill", el), pct = $(".loader__pct", el), skip = $(".loader__skip", el);
       const len = trace.getTotalLength();
-      gsap.set(trace, { opacity: 1, strokeDasharray: len, strokeDashoffset: reduce ? 0 : len });
-      if (!reduce) gsap.to(trace, { strokeDashoffset: 0, duration: 1.6, ease: "power2.inOut" });
-      const w = { x: 0, y: 250, shown: 0 }, t0 = performance.now();
-      const put = () => wave.setAttribute("transform", `translate(${w.x.toFixed(1)} ${w.y.toFixed(1)})`);
+      gsap.set(trace, { strokeDasharray: len, strokeDashoffset: reduce ? 0 : len });
+      if (!reduce) gsap.to(trace, { strokeDashoffset: 0, duration: 1.8, ease: "power2.inOut" });
+      // the fill runs left to right like a progress bar, with a clean edge
+      const st = { shown: 0, peak: 0 }, t0 = performance.now();
+      const put = () => fill.setAttribute("width", (20 + st.shown * 770).toFixed(1));
       put();
       let finished = false;
       const finish = () => {
         if (finished) return;
         finished = true;
         gsap.ticker.remove(tick);
+        // the hero logo sits exactly under this one: once the dark lifts, it simply stays
+        gsap.set(".hero__title", { visibility: "visible" });
         gsap.timeline({ onComplete: () => { el.remove(); done(true); } })
-          .to(w, { y: -40, duration: 0.5, ease: "power2.out", onUpdate: put })
-          .to(trace, { opacity: 0, duration: 0.6 }, 0.2)
-          .to(pct, { opacity: 0, duration: 0.4 }, 0)
-          .set("[data-intro]", { visibility: "visible" }, 0.55)
-          .to(el, { backgroundColor: "rgba(5, 6, 5, 0)", duration: reduce ? 0 : 1.4, ease: "power2.inOut" }, 0.55)
-          .set(el, { opacity: 0 });
-        if (hero.rain) gsap.to(hero.rain.state, { expo: 1, duration: 2.4, ease: "power2.out", delay: 0.4 });
+          .to(st, { shown: 1, duration: 0.45, ease: "power2.out", onUpdate: put })
+          .to([trace, pct, skip], { opacity: 0, duration: 0.5, ease: "power1.out" }, 0.15)
+          .add(() => { if (introTl) introTl.play(); }, 0.5)
+          .to(el, { backgroundColor: "rgba(5, 6, 5, 0)", duration: reduce ? 0 : 1.3, ease: "power2.inOut" }, 0.5)
+          .set($(".loader__logo", el), { opacity: 0 });
       };
       skip.addEventListener("click", finish);
       const tick = () => {
         const now = performance.now(), v = hero.voice, b = v && v.brain;
         const scene = hero.rain ? (hero.rain.ready ? 1 : 0) : 1;
         const mind = !b || b.off || b.ready ? (b && !b.ready && !b.off && b.status === "checking" ? 0 : 1) : 0.05 + b.progress * 0.88;
-        // the water only ever rises, even when a new file starts and the raw percentage dips
-        const target = (w.peak = Math.max(w.peak || 0, Math.min(1, 0.12 * scene + 0.88 * mind)));
-        w.shown += (target - w.shown) * (reduce ? 1 : 0.05);
-        w.y = 250 - 290 * w.shown; w.x -= 0.6; put();
-        const n = Math.floor(w.shown * 100);
+        // progress only ever moves forward, even when a new file starts and the raw percentage dips
+        st.peak = Math.max(st.peak, Math.min(1, 0.12 * scene + 0.88 * mind));
+        st.shown += (st.peak - st.shown) * (reduce ? 1 : 0.06);
+        put();
+        const n = Math.floor(st.shown * 100);
         if (pct.textContent !== n + "%") { pct.textContent = n + "%"; el.setAttribute("aria-valuenow", n); }
         if (now - t0 > 14000) skip.classList.add("is-on");
-        if (target >= 1 && w.shown > 0.985 && now - t0 > (reduce ? 300 : 1900)) finish();
+        if (st.peak >= 1 && st.shown > 0.985 && now - t0 > (reduce ? 300 : 2100)) finish();
       };
       gsap.ticker.add(tick);
     });
@@ -904,7 +906,11 @@
     // pages split their lines only once the real faces are in
     if (r0.page !== "home") openPage(r0.page);
     fitAll();
-    if (r0.page === "home") load().then((filled) => intro(filled)); else { gsap.set("[data-intro]", { visibility: "visible" }); if (hero.rain) hero.rain.set("expo", 1); }
+    if (r0.page === "home") {
+      // with a loading screen, the landing's entrance is set up underneath it, paused, and plays once when it lifts
+      if ($("#loader")) { const tl = intro(true, true); load(tl).then(() => { if (!tl) gsap.set("[data-intro]", { visibility: "visible" }); }); }
+      else intro();
+    } else { gsap.set("[data-intro]", { visibility: "visible" }); if (hero.rain) hero.rain.set("expo", 1); }
     if (r0.slug) openCase(r0.slug, false);
     ScrollTrigger.refresh();
   });
