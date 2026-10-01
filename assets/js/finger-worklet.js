@@ -40,84 +40,87 @@ class Finger extends AudioWorkletProcessor {
     };
   }
   thud(a) { this.ev.push({ k: "thud", n: 0, len: Math.round(sampleRate * 0.05), a: a * (0.8 + rnd() * 0.4), f: 150 + rnd() * 60, lp: 0 }); }
-  wet(s) { if (this.ev.length < 12) this.ev.push({ k: "wet", n: 0, len: Math.round(sampleRate * 0.03), a: 0.25 + Math.min(1, s) * 0.75, f: 1500 + rnd() * 1400, bp: new BQ().set("bp", 1600 + rnd() * 1800, 1.4) }); }
-  // ---------- v3: modelled on a real recording of a wet fingertip dragged across window glass ----------
-  // What the recording shows, and what this does:
-  // · the sound is almost all tone: a near-sine (2nd harmonic −22 dB, 3rd −25 dB, the rest below −40), low,
-  //   between 150 and 650 Hz, with almost no broadband rub and nothing above ~2 kHz
-  // · the pitch does not glide: it locks onto a few preferred frequencies (the finger and pane resonating
-  //   together, here ~150, 190, 234, 293, 360, 422, 516, 650 Hz), holds one for 30–100 ms, then hops
-  // · a slow drag gives separate squeaks of 160–360 ms (rise 30–80 ms, a longer 130–280 ms tail); a steady
-  //   drag at medium speed keeps one long, hopping squeal going
-  // · the hand trembles: a 4–6 Hz swell in level, and a hair of pitch wobble
-  // Each touch gets its own slightly different set of modes, as a different finger or pane would.
-  touch3() {
-    const k = 0.95 + rnd() * 0.1;
-    this.modes = [150, 190, 234, 293, 360, 422, 516, 650].map((f) => f * k * (0.98 + rnd() * 0.04));
+  wet(s) {
+    const now = currentTime;
+    if (now - (this.lastWet || 0) < 0.25 || rnd() < 0.5 || this.ev.length > 4) return;
+    this.lastWet = now;
+    this.ev.push({ k: "wet", n: 0, len: Math.round(sampleRate * 0.03), a: (0.25 + Math.min(1, s) * 0.75) * 0.35, f: 900 + rnd() * 500, bp: new BQ().set("bp", 700 + rnd() * 500, 1.2) });
   }
+  // ---------- v4: a wet fingertip on window glass, from the physics and a real recording ----------
+  // Why it squeaks: on clean wet glass the skin grips (no oil, a thin water film), builds up shear, and slips,
+  // hundreds of times a second (stick-slip). The ridges of the fingerprint (~0.5 mm apart) set the rhythm, so the
+  // pitch follows the speed of the finger: 0.1–0.3 m/s gives the 200–600 Hz measured in the recording, and a
+  // finger going back and forth draws pitch arcs that fall away at every turn.
+  // What the recording measures, and what this does:
+  // · clean stretches (40–180 ms): an almost pure tone (2nd harmonic −24 dB, 3rd −33, 4th −40)
+  // · rough stretches in between: the grip slipping irregularly, a low, dull rumble (250–500 Hz), ~4 dB quieter
+  // · starting to move: a short rough catch before it sings; stopping or turning: the pitch sinks and it fades
+  // · no fixed notes: the pitch glides continuously with the hand, with a hair of cycle-to-cycle jitter
+  touch3() { this.p3 = 0.85 + rnd() * 0.3; } // each touch presses a little differently
   process3(L, R, n, sr, v) {
-    const s3 = this.s3 || (this.s3 = { on: 0, env: 0, dwell: 0, hold: 0, mode: 2, f: 234, fT: 234, ph: 0, ph2: 0, ph3: 0, trem: 0, tremF: 5, tremP: 0, jit: 0, amp: 0.1, lp: 0, rise: 0.05, fall: 0.2 });
-    if (!this.modes) this.touch3();
-    const M = this.modes;
-    // speed chooses the register: slow, low and intermittent; steady, higher and continuous
-    const reg = Math.max(0, Math.min(M.length - 1, Math.round(2 + Math.min(1.2, v) * 4.6 + (this.press - 0.7) * 2)));
-    s3.dwell -= n / sr;
-    if (!this.contact || v < 0.015) { s3.on = 0; }
-    else if (s3.dwell <= 0) {
-      if (s3.on) {
-        // a squeak ends: soon at a slow drag, rarely while the finger keeps a steady pace
-        s3.on = 0; s3.dwell = v < 0.25 ? 0.06 + rnd() * 0.35 : 0.02 + rnd() * 0.09;
-      } else {
-        const want = 0.35 + Math.min(0.55, v * 0.9) + Math.min(1, Math.abs(this.a)) * 0.2 + this.turn * 0.5;
-        if (rnd() < Math.min(0.97, want * (0.6 + 0.4 * this.press))) {
-          s3.on = 1; this.turn = 0;
-          s3.dwell = v < 0.25 ? 0.16 + rnd() * 0.2 : 0.3 + rnd() * 1.2;
-          s3.rise = 0.03 + rnd() * 0.05; s3.fall = 0.13 + rnd() * 0.15;
-          s3.mode = Math.max(0, Math.min(M.length - 1, reg + Math.round((rnd() - 0.5) * 2)));
-          s3.amp = 0.11 + rnd() * 0.07; s3.hold = 0.03 + rnd() * 0.07;
-          this.port.postMessage({ squeak: 1 });
-        } else s3.dwell = 0.03 + rnd() * 0.12;
-      }
+    const s = this.s4 || (this.s4 = { body: new BQ(), body2: new BQ(), rl1: new BQ(), rl2: new BQ(), sh: 1, shT: 1, fz: new BQ(), voiced: 0, dwell: 0, wv: 0, wr: 0, gate: 0, f: 260, ph: 0, ph2: 0, ph3: 0, ph4: 0, jit: 0, wander: 0, moving: 0, slip: 0, nextSlip: 0, bp: new BQ(), lp: new BQ(), rumble: new BQ(), wl: 0 });
+    const press = (this.p3 || 1) * (0.75 + 0.5 * this.press);
+    // the pitch the speed asks for: continuous, a touch higher when pressing harder
+    const fT = (200 + 420 * Math.min(1.2, v)) * (0.92 + 0.16 * press);
+    // is the finger sliding? a squeak needs some speed; starting from rest it first catches roughly
+    const sliding = this.contact && v > 0.035;
+    if (sliding && !s.moving) { s.moving = 1; s.voiced = 0; s.dwell = 0.05 + rnd() * 0.04; }
+    if (!sliding) s.moving = 0;
+    s.dwell -= n / sr;
+    if (s.moving && s.dwell <= 0) {
+      // clean and rough stretches alternate; moderate speed and pressure keep it singing longer
+      const pv = Math.min(0.72, 0.38 + 0.32 * Math.min(1, v * 2) * press);
+      s.voiced = rnd() < pv ? 1 : 0;
+      s.dwell = s.voiced ? 0.04 + rnd() * 0.12 : 0.03 + rnd() * 0.08;
+      s.shT = 0.75 + rnd() * 0.5;
     }
-    // while it sings, it hops between neighbouring modes, drifting with the speed
-    if (s3.on) {
-      s3.hold -= n / sr;
-      if (s3.hold <= 0) {
-        s3.hold = 0.03 + rnd() * 0.07;
-        const toward = Math.sign(reg - s3.mode), step = rnd() < 0.55 ? toward : rnd() < 0.5 ? -1 : 1;
-        if (rnd() < 0.6) s3.mode = Math.max(0, Math.min(M.length - 1, s3.mode + step));
-      }
-      s3.fT = M[s3.mode];
-    }
-    if ((s3.tremP += n / sr) > 0.6) { s3.tremP = 0; s3.tremF = 4 + rnd() * 2; }
+    // loudness: arrives with the slide, barely depends on speed once singing
+    const gateT = sliding ? Math.min(1, (v - 0.035) / 0.08) * (0.7 + 0.3 * Math.min(1, v)) : 0;
+    s.rumble.set("bp", 230 + 150 * Math.min(1, v), 1.1); s.body.set("lp", 280, 0.7); s.body2.set("hp", 90, 0.7); s.rl1.set("lp", 650, 0.7); s.rl2.set("lp", 650, 0.7); s.lp.set("lp", 2200, 0.7); s.fz.set("bp", s.f, 2.5);
     const pl = Math.cos(((this.x + 1) / 4) * Math.PI), pr = Math.sin(((this.x + 1) / 4) * Math.PI);
-    const up = 1 - Math.exp(-1 / (sr * s3.rise)), down = 1 - Math.exp(-1 / (sr * s3.fall)), hop = 1 - Math.exp(-1 / (sr * 0.006));
+    const kG = 1 - Math.exp(-1 / (sr * 0.025)), kV = 1 - Math.exp(-1 / (sr * 0.012)), kF = 1 - Math.exp(-1 / (sr * 0.02));
     for (let i = 0; i < n; i++) {
-      s3.env += ((s3.on ? 1 : 0) - s3.env) * (s3.on ? up : down);
-      let s = 0;
-      if (s3.env > 1e-4) {
-        s3.f += (s3.fT - s3.f) * hop;                       // a quick snap to the next mode, not a slide
-        s3.jit += (white() * 0.004 - s3.jit) * 0.002;        // a hair of instability in the grip
-        s3.trem += s3.tremF / sr; if (s3.trem > 1) s3.trem -= 1;
-        const f = s3.f * (1 + s3.jit), am = 0.78 + 0.22 * Math.sin(s3.trem * TAU);
-        s3.ph += f / sr; s3.ph2 += (2 * f) / sr; s3.ph3 += (3 * f) / sr;
-        s3.ph -= s3.ph | 0; s3.ph2 -= s3.ph2 | 0; s3.ph3 -= s3.ph3 | 0;
-        const tone = Math.sin(s3.ph * TAU) + 0.08 * Math.sin(s3.ph2 * TAU) + 0.06 * Math.sin(s3.ph3 * TAU) + 0.012 * Math.sin(s3.ph2 * 2 * TAU);
-        // and the faintest wet breath under it, low-passed, as the recording has
-        // the grip is never perfectly clean: a little roughness rides on the tone, more when pressing harder
-        s3.lp += (white() - s3.lp) * 0.1;
-        const rough = 1 + s3.lp * 0.35 * this.press;
-        s = (tone * rough + s3.lp * 0.12) * s3.env * am * s3.amp * this.press;
+      s.gate += (gateT - s.gate) * kG;
+      s.wv += ((s.moving && s.voiced ? 1 : 0) - s.wv) * kV;
+      s.wr += ((s.moving && !s.voiced ? 1 : 0) - s.wr) * kV;
+      let out = 0;
+      if (s.gate > 1e-4) {
+        s.f += (fT - s.f) * kF;
+        s.jit += (white() * 0.035 - s.jit) * 0.03;            // cycle-to-cycle jitter of the grip (the real one is never steady)
+        s.wander += (white() * 0.08 - s.wander) * 0.0006;     // and a slow drift of pressure
+        s.sh += (s.shT * (0.85 + 0.3 * rnd()) - s.sh) * 0.002; // and of loudness
+        const f = s.f * (1 + s.jit + s.wander);
+        // clean: the near-pure tone, as measured
+        if (s.wv > 1e-4) {
+          s.ph += f / sr; s.ph2 += (2 * f) / sr; s.ph3 += (3 * f) / sr; s.ph4 += (4 * f) / sr;
+          s.ph -= s.ph | 0; s.ph2 -= s.ph2 | 0; s.ph3 -= s.ph3 | 0; s.ph4 -= s.ph4 | 0;
+          const tone = Math.sin(s.ph * TAU) + 0.063 * Math.sin(s.ph2 * TAU) + 0.022 * Math.sin(s.ph3 * TAU) + 0.01 * Math.sin(s.ph4 * TAU);
+          // the fuzz around the tone: friction noise riding on the same pitch
+          out += (tone + s.fz.run(white()) * 0.75) * s.wv * s.sh;
+        }
+        // rough: irregular slips at about the same rate, ringing low and dull
+        if (s.wr > 1e-4) {
+          if (--s.nextSlip <= 0) { s.nextSlip = (sr / f) * (0.55 + rnd() * 0.9); s.slip = 0.6 + rnd() * 0.8; }
+          const imp = s.slip; s.slip *= 0.6;
+          s.wl += (white() - s.wl) * 0.15;
+          // only low and dull, as measured: two gentle low-passes keep the slips from clicking
+          out += s.rl2.run(s.rl1.run(s.rumble.run(imp * 2.2 + s.wl * 0.35) * 2.4)) * s.wr * 0.95;
+        }
+        // the pane's low body under the pressing finger, there all the time it slides
+        out += s.body2.run(s.body.run(white())) * 3.2;
+        // and the faint hiss of skin on wet glass, high and soft
+        s.hs = (s.hs || 0) * 0.3 + white() * 0.7; out += s.hs * 0.035 * (0.5 + 0.5 * s.sh);
+        out = s.lp.run(out) * s.gate * 0.13 * press;
       }
-      // touch, lift and drops crossed, as before
+      // touch, lift and drops crossed
       for (const e of this.ev) {
         const t = e.n / sr;
-        if (e.k === "thud") { e.lp += (white() - e.lp) * 0.08; s += (Math.sin(TAU * e.f * t) * 0.6 + e.lp * 0.8) * Math.exp(-t / 0.012) * e.a * 0.12; }
-        else s += (e.bp.run(white()) * Math.exp(-t / 0.004) * 0.6 + Math.sin(TAU * (e.f * 0.45 + 2500 * t) * t) * Math.exp(-t / 0.008) * 0.25) * e.a * 0.08;
+        if (e.k === "thud") { e.lp += (white() - e.lp) * 0.08; out += (Math.sin(TAU * e.f * t) * 0.6 + e.lp * 0.8) * Math.exp(-t / 0.012) * e.a * 0.12; }
+        else out += (e.bp.run(white()) * Math.exp(-t / 0.004) * 0.5) * e.a * 0.07;
         e.n++;
       }
-      s *= this.level;
-      L[i] = s * pl; R[i] = s * pr;
+      out *= this.level;
+      L[i] = out * pl; R[i] = out * pr;
     }
     if (this.ev.length) this.ev = this.ev.filter((e) => e.n < e.len);
     return true;
