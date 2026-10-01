@@ -420,7 +420,28 @@
       if (k === "storm") { gsap.timeline().to(rain.state, { storm: 1, duration: 2.5, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 6, ease: "sine.inOut" }, "+=18"); gsap.delayedCall(2.6, () => { rain.state.flash = 0.9; gsap.to(rain.state, { flash: 0, duration: 1, ease: "power2.out" }); if (window.Sound) Sound.thunder(0.15); }); }
     };
     // every turn of the conversation goes through here
-    let played = 0, nudged = 0;
+    let played = 0, nudged = 0, hints = 0;
+    // quiet moments: when nobody has written for a while, or the hour turns, the voice says something small.
+    // Never while someone is writing, never over another line, never too often
+    let lastAct = performance.now(), nextIdle = 30000, idleN = 0, lastPeriod = null, idleBusy = false, lastSaid = 0;
+    addEventListener("pointerdown", () => { lastAct = performance.now(); nextIdle = 30000; }, true);
+    const periodOf = (h) => (h >= 6 && h < 10.5 ? "morning" : h >= 10.5 && h < 14.5 ? "midday" : h >= 14.5 && h < 18.3 ? "afternoon" : h >= 18.3 && h < 20.3 ? "sunset" : h >= 20.3 && h < 22.3 ? "evening" : "night");
+    setInterval(async () => {
+      if (!voice || idleBusy || mode !== "focus" || busy || !introEnd || document.hidden) return;
+      const now = performance.now();
+      if (now < introEnd + 8000 || vEl.classList.contains("is-on") || wiping || (ink && (ink.strokes.length || ink.busy))) return;
+      const period = periodOf(hourNow), idle = now - lastAct;
+      let reason = null;
+      // the turns of the day worth a word: morning, sunset, night
+      if (period !== lastPeriod) { if (lastPeriod !== null && idle > 6000 && ["morning", "sunset", "night"].includes(period)) reason = "hour"; lastPeriod = period; }
+      if (!reason && idle > nextIdle) reason = "idle";
+      if (!reason || idleN >= 8 || now - lastSaid < 35000) return;
+      idleN++; lastSaid = now; nextIdle = idle + 40000 + Math.random() * 35000; idleBusy = true;
+      try {
+        const text = await voice.ambient({ period, hour: hourNow, storm: rain.state.storm > 0.5, rain: rain.state.rain * (1 + rain.state.storm), idle });
+        if (text && mode === "focus" && !busy && !vEl.classList.contains("is-on") && performance.now() - lastAct > 4000 && !wiping) voice.say(text, Math.min(7, 2.6 + text.length / 22));
+      } finally { idleBusy = false; }
+    }, 1000);
     const ignored = () => {
       if (!voice || mode !== "focus") return;
       played++;
@@ -465,7 +486,7 @@
       const over = mode === "focus" && !!e.target.closest(".hero");
       tip.classList.toggle("is-on", over);
       // until someone writes, the voice keeps inviting them to
-      if (over && !wrote && voice && !vEl.classList.contains("is-on") && performance.now() - lastHint > 9000 && performance.now() > introEnd) { lastHint = performance.now(); voice.say(voice.t("hello"), 5); }
+      if (over && !wrote && hints < 2 && voice && !vEl.classList.contains("is-on") && performance.now() - lastHint > 9000 && performance.now() > introEnd) { lastHint = performance.now(); hints++; voice.say(voice.t("hello"), 5); }
       const d = Math.round(rain.fingerRadius() * 2);
       if (tip._d !== d) { tip._d = d; Object.assign(tip.style, { width: d + "px", height: d + "px", margin: `${-d / 2}px 0 0 ${-d / 2}px` }); }
       tx(e.clientX); ty(e.clientY);

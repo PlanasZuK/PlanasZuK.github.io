@@ -267,6 +267,14 @@ octagon|an octagon|un octàgon|un octógono`.split("\n").map((r) => { const [k, 
   const LINES = {
     en: {
       hello: "Write anything with your finger!",
+      idle_morning: ["Morning rain is the best rain. Coffee in hand, I hope?", "The birds are up. Are you a morning person?", "Early start. Rain sounds better before the emails, don't you think?"],
+      idle_midday: ["Midday and still raining. Perfect lunch weather, if you ask me.", "Lunchtime. What do you eat when it rains?", "Grey noon, bright ideas. That's the deal here."],
+      idle_afternoon: ["Slow afternoon. The drops are racing down the glass; I'm betting on the left one.", "Afternoon rain makes everything softer. Even deadlines.", "Still here? I like that. Tell me something."],
+      idle_sunset: ["Look, the light is turning gold behind the rain.", "Sunset through wet glass. I never get tired of it.", "The blackbird is singing. It does that every evening, you know?"],
+      idle_evening: ["Evening already. The rain gets cosier as it gets dark.", "Time for a blanket and a good website. Or just the blanket.", "The street lights must be on by now. Do you like the evening?"],
+      idle_night: ["Night. Just us and the rain now.", "It's late. The rain doesn't sleep, and apparently neither do you.", "At night every drop sounds closer. Listen."],
+      idle_storm: ["That was a big one. All right over there?", "Storm outside, calm in here. Best of both worlds.", "I love a storm. From behind the glass, obviously."],
+      idle_any: ["Still there? Write me anything: a word, a doodle, your name.", "I could watch the rain all day. Actually, I do.", "What brings you here today?"],
       askBiz: ["What does your business do? You can draw it if you like!", "So, what’s your business? Draw it, if words are too dry."],
       open: [(n) => `${cap(n)}!`, (n) => `${cap(n)}, right?`],
       pitch: {
@@ -330,6 +338,14 @@ octagon|an octagon|un octàgon|un octógono`.split("\n").map((r) => { const [k, 
     },
     ca: {
       hello: "Escriu el que vulguis amb el dit!",
+      idle_morning: ["La pluja del matí és la millor. Amb un cafè a la mà, espero?", "Els ocells ja s’han despertat. Ets de matinar?", "Matí de pluja. Sona millor abans dels correus, oi?"],
+      idle_midday: ["Migdia i encara plou. Temps perfecte per dinar tranquil.", "Hora de dinar. Què menges quan plou?", "Migdia gris, idees clares. Aquí funciona així."],
+      idle_afternoon: ["Tarda tranquil·la. Les gotes fan curses pel vidre; jo aposto per la de l’esquerra.", "La pluja de la tarda ho fa tot més suau. Fins i tot les entregues.", "Encara aquí? M’agrada. Explica’m alguna cosa."],
+      idle_sunset: ["Mira, la llum es torna daurada darrere la pluja.", "Posta de sol a través del vidre mullat. No me’n canso mai.", "La merla canta. Ho fa cada vespre, saps?"],
+      idle_evening: ["Ja és vespre. La pluja és més acollidora quan es fa fosc.", "Hora de manta i d’una bona web. O només de manta.", "Ja deuen haver encès els fanals. T’agrada el vespre?"],
+      idle_night: ["Nit. Ara només som tu, jo i la pluja.", "És tard. La pluja no dorm, i pel que veig tu tampoc.", "De nit cada gota sona més a prop. Escolta."],
+      idle_storm: ["Aquest ha estat fort. Tot bé per aquí?", "Tempesta a fora, calma a dins. El millor dels dos mons.", "M’encanten les tempestes. Des de darrere el vidre, és clar."],
+      idle_any: ["Encara hi ets? Escriu-me el que vulguis: una paraula, un dibuix, el teu nom.", "Podria mirar ploure tot el dia. De fet, ho faig.", "Què et porta per aquí, avui?"],
       askBiz: ["A què es dedica el teu negoci? Si vols, dibuixa-ho!", "I tu, a què et dediques? Si t’és més fàcil, dibuixa-ho."],
       open: [(n) => `${cap(n)}!`, (n) => `${cap(n)}, oi?`],
       pitch: {
@@ -393,6 +409,14 @@ octagon|an octagon|un octàgon|un octógono`.split("\n").map((r) => { const [k, 
     },
     es: {
       hello: "¡Escribe lo que quieras con el dedo!",
+      idle_morning: ["La lluvia de la mañana es la mejor. Con un café en la mano, ¿verdad?", "Los pájaros ya se han despertado. ¿Eres de madrugar?", "Mañana de lluvia. Suena mejor antes de los correos, ¿no?"],
+      idle_midday: ["Mediodía y sigue lloviendo. Tiempo perfecto para comer tranquilo.", "Hora de comer. ¿Qué comes cuando llueve?", "Mediodía gris, ideas claras. Aquí funciona así."],
+      idle_afternoon: ["Tarde tranquila. Las gotas hacen carreras por el cristal; yo apuesto por la de la izquierda.", "La lluvia de la tarde lo suaviza todo. Hasta las entregas.", "¿Sigues aquí? Me gusta. Cuéntame algo."],
+      idle_sunset: ["Mira, la luz se vuelve dorada detrás de la lluvia.", "Atardecer a través del cristal mojado. Nunca me canso.", "El mirlo está cantando. Lo hace cada tarde, ¿sabes?"],
+      idle_evening: ["Ya anochece. La lluvia es más acogedora cuando oscurece.", "Hora de manta y de una buena web. O solo de manta.", "Ya deben de estar las farolas encendidas. ¿Te gusta el anochecer?"],
+      idle_night: ["Noche. Ahora solo estamos tú, yo y la lluvia.", "Es tarde. La lluvia no duerme y, por lo que veo, tú tampoco.", "De noche cada gota suena más cerca. Escucha."],
+      idle_storm: ["Ese ha sido fuerte. ¿Todo bien por ahí?", "Tormenta fuera, calma dentro. Lo mejor de los dos mundos.", "Me encantan las tormentas. Desde detrás del cristal, claro."],
+      idle_any: ["¿Sigues ahí? Escríbeme lo que quieras: una palabra, un dibujo, tu nombre.", "Podría mirar llover todo el día. De hecho, lo hago.", "¿Qué te trae por aquí hoy?"],
       askBiz: ["¿A qué se dedica tu negocio? ¡Si quieres, dibújalo!", "¿Y tú a qué te dedicas? Si te es más fácil, dibújalo."],
       open: [(n) => `¡${cap(n)}!`, (n) => `${cap(n)}, ¿verdad?`],
       pitch: {
@@ -621,6 +645,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       if (this.declined) sys += "\n" + NOPUSH[L];
       const shots = shuffle(SHOTS[L]).slice(0, 4);
       if (drawing) shots.push(DRAWSHOT[L]);
+      if (text.startsWith("[quiet moment")) shots.push(["[quiet moment: 21:40, evening, gentle rain; the visitor has been quiet for 40 seconds]", "Evening already. The rain gets cosier in the dark. Still with me?"]);
       const msgs = [{ role: "system", content: sys }, ...shots.flatMap(([u, a]) => [{ role: "user", content: u }, { role: "assistant", content: a }]), ...this.history.slice(-4), { role: "user", content: text }];
       // while it thinks, the rain knows the graphics card is busy and does not mistake it for a slow computer
       window.__thinking = true;
@@ -631,14 +656,14 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
     }
     // ask the model in English, and ask again (a little bolder) if the answer repeats itself or invents something;
     // then hand it back in the page's language
-    async ask(text, drawing = false) {
+    async ask(text, drawing = false, quiet = false) {
       const en = this.lang === "en" || drawing ? text : (await translate(text, "auto", "en")) || text;
       for (let i = 0; i < 2; i++) {
         const raw = await this.think(en, 0.8 + i * 0.15, drawing), out = tidy(raw).replace(/^(ah|oh|ooh|well|hmm)[,!.]\s+/i, "").replace(/^./, (x) => x.toUpperCase());
         const why = !out ? "empty" : WRONG.test(out) || madeUp(out) ? "off" : GUSH.test(out) && i === 0 ? "gushing" : this.saidE.some((s) => alike(s, out) > 0.5) ? "repeat" : WET.test(out) && this.wet >= 1 && !WET.test(en) ? "rain again" : "";
         console.info("[cervell]", JSON.stringify(en), "→", JSON.stringify(raw), why ? `(${why})` : "");
         if (!why || (i === 1 && out && why !== "off")) {
-          this.history.push({ role: "user", content: en }, { role: "assistant", content: out });
+          if (!quiet) this.history.push({ role: "user", content: en }, { role: "assistant", content: out });
           this.history = this.history.slice(-6);
           this.saidE.push(out); if (this.saidE.length > 12) this.saidE.shift();
           if (WET.test(out)) this.wet++;
@@ -646,6 +671,19 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
         }
       }
       return "";
+    }
+    // a quiet moment: the visitor has not written for a while, or the hour has turned. Say something small,
+    // in character, about the moment (the model when it is awake, the written lines otherwise)
+    async ambient(c) {
+      const hh = Math.floor(c.hour), mm = Math.floor((c.hour % 1) * 60), when = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+      const sky = c.storm ? "a thunderstorm" : c.rain > 1.2 ? "heavy rain" : "gentle rain";
+      const q = !this.biz && Math.random() < 0.45 ? " You may end with a light question for them." : "";
+      if (this.brain && this.brain.ready) {
+        const out = await this.ask(`[quiet moment: ${when}, ${c.period}, ${sky}; the visitor has been quiet for ${Math.round(c.idle / 1000)} seconds. Say one short line in character about this moment: the hour, the rain, the light.${q}]`, false, true);
+        if (out) return this.remember(out);
+      }
+      const k = c.storm ? "storm" : Math.random() < 0.75 ? c.period : "any";
+      return this.remember(this.t("idle_" + k));
     }
     // is the visitor talking to me, or just playing with the glass? Only a real attempt deserves an answer
     deliberate(inp) {
