@@ -397,6 +397,7 @@
     const c = $(".hero__rain"), el = $(".hero"), tip = $(".touch");
     if (!c || !window.Rain || !Rain.supported) return {};
     const rain = new Rain(c, { img: c.dataset.img, mask: c.dataset.mask, reduce });
+    rain.onLand = (x, s) => { if (window.Sound && Sound.on) Sound.tap(x, s); };
     const live = () => mode !== "page" && !busy;
     const tx = gsap.quickTo(tip, "x", { duration: 0.2, ease: "power3" }), ty = gsap.quickTo(tip, "y", { duration: 0.2, ease: "power3" });
     // a mouse: press and drag to wipe the glass
@@ -493,7 +494,7 @@
     // if there is a real storm where the visitor is, it storms here too
     const strike = () => {
       if (rain.state.storm > 0.5 && mode !== "page" && !reduce)
-        gsap.timeline().to(rain.state, { flash: 0.9, duration: 0.05 }).to(rain.state, { flash: 0.12, duration: 0.09 }).to(rain.state, { flash: 0.7, duration: 0.05 }).to(rain.state, { flash: 0, duration: 0.9, ease: "power2.out" });
+        (window.Sound && Sound.thunder(Math.random() * 0.85 + 0.1), gsap.timeline().to(rain.state, { flash: 0.9, duration: 0.05 })).to(rain.state, { flash: 0.12, duration: 0.09 }).to(rain.state, { flash: 0.7, duration: 0.05 }).to(rain.state, { flash: 0, duration: 0.9, ease: "power2.out" });
       gsap.delayedCall(6 + Math.random() * 14, strike);
     };
     const q = new URLSearchParams(location.search);
@@ -858,7 +859,7 @@
     const split = SplitText.create(".hero__line", { type: "lines", mask: "lines" });
     tl.from(split.lines, { yPercent: 110, duration: 1.3, ease: EO, stagger: 0.07 }, at)
       .from(".hero__sky", { yPercent: 120, clipPath: "inset(0 0 100% 0)", duration: 1.1, ease: EO }, at - 0.05)
-      .from(".bar__all", { yPercent: -140, duration: 1.2, ease: EO }, at + 0.2)
+      .from(".bar__all, .bar__sound", { yPercent: -140, duration: 1.2, ease: EO }, at + 0.2)
       .from(".vcard", { yPercent: 130, duration: 1.4, ease: EO }, at + 0.3);
     // whatever happens during the intro, it always ends complete
     tl.eventCallback("onInterrupt", () => tl.progress(1));
@@ -926,6 +927,13 @@
     const now = performance.now();
     if (hero.rain) { hero.rain.active = mode !== "page"; hero.rain.tick(now); }
     if (FXOK) FX.tick(now);
+    // the sound follows the scene: rain, wind, hour, storm, the camera pulling back, the fingertip
+    if (window.Sound && Sound.on && hero.rain) {
+      const r = hero.rain, s = r.state, dz = Math.abs(Z.v - (follow.z || 0)) * 60;
+      follow.z = Z.v;
+      follow.wh = Math.max(dz, (follow.wh || 0) * 0.9);
+      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0, whoosh: Math.min(1, follow.wh * 0.6) }, now);
+    }
   });
   const fontsReady = Promise.race([d.fonts ? d.fonts.ready : Promise.resolve(), new Promise((res) => setTimeout(res, 1600))]);
   fontsReady.then(() => {

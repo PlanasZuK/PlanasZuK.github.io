@@ -42,9 +42,20 @@ export async function tune(rain, sky) {
   day.add(s, "light", { "Amb el scroll": "scroll", "Matí": "dawn", "Migdia": "day", "Capvespre": "dusk", "Nit": "night", "Tempesta": "storm" }).name("Llum").onChange((m) => sky(m));
   day.add(rain.state, "storm", 0, 1, 0.01).name("Tempesta").listen();
   day.close();
+  // the sound, layer by layer (turn it on first with the switch in the bar)
+  if (window.Sound) {
+    const SK = "pp-sound-mix";
+    try { const m = JSON.parse(localStorage.getItem(SK) || "null"); if (m) for (const k in m) Sound.setMix(k, m[k]); } catch (e) {}
+    const SL = { master: "Volum general", room: "Sala (reverberació)", bed: "Pluja de fora", patter: "Gotes a l’ampit i les fulles", drips: "Degoteig de la canal", taps: "Gotes que piquen al vidre", wind: "Vent", finger: "El dit al vidre", thunder: "Trons", keys: "Tecles de la veu", ui: "Botons", whoosh: "Moviment de la càmera" };
+    const sf = gui.addFolder("So");
+    for (const k of Object.keys(Sound.mix)) sf.add(Sound.mix, k, 0, k === "master" ? 1.5 : 2, 0.01).name(SL[k] || k).onChange((v) => { Sound.setMix(k, v); try { localStorage.setItem(SK, JSON.stringify(Sound.mix)); } catch (e) {} });
+    sf.add({ t: () => Sound.post({ thunder: 0.25 }) }, "t").name("Fer un tro a prop");
+    sf.add({ t: () => Sound.post({ thunder: 0.85 }) }, "t").name("Fer un tro lluny");
+    sf.close();
+  }
   const act = {
     copy: async () => {
-      const text = JSON.stringify(rain.P, null, 2);
+      const text = JSON.stringify(window.Sound ? { ...rain.P, sound: Sound.mix } : rain.P, null, 2);
       try { await navigator.clipboard.writeText(text); btn.name("Copiat ✓"); } catch (e) { prompt("Copia aquests ajustos:", text); }
       setTimeout(() => btn.name("Copiar ajustos"), 1600);
     },

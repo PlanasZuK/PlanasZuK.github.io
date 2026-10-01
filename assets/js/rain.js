@@ -379,7 +379,9 @@ void main() { o = texture(uSp, vT) * vA; }`;
       this.area = (W * H) / (1440 * 900);
       this.fw = 72; this.fh = 45;
       this.friction = Array.from({ length: this.fw * this.fh }, () => Math.random());
+      this.quiet = true;
       for (let i = 0; i < 360; i++) this.step(1 / 30, true);
+      this.quiet = false;
       this.drops.forEach((q) => { q.r = q.g; q.age = 9; });
     }
     // the drawing buffers. The glass is drawn at the screen's resolution (within a pixel budget, and a touch
@@ -421,6 +423,8 @@ void main() { o = texture(uSp, vT) * vA; }`;
     }
     land(x, y, r, stretch = 1) {
       const P = this.P;
+      // every drop that hits the pane is heard where it lands
+      if (this.onLand && !this.quiet) this.onLand((x / this.water.width) * 2 - 1, r / (P.maxSize * this.k));
       for (const q of this.near(x, y, r + 14 * this.k)) {
         const dx = q.x - x, dy = q.y - y, R = (q.g + r) * 0.85;
         if (!q.dead && dx * dx + dy * dy < R * R) { q.g = Math.min(Math.sqrt(q.g * q.g + r * r), P.maxSize * this.k); return q; }
@@ -459,6 +463,9 @@ void main() { o = texture(uSp, vT) * vA; }`;
       this.par.tx = (p.x - 0.5) * -0.01 * k; this.par.ty = (p.y - 0.5) * 0.007 * k;
       if (!this.finger) return;
       const f = this.finger, x0 = f.x, y0 = f.y;
+      // how fast the fingertip moves, in screen widths per second, for its sound
+      const tn = performance.now(), sp = Math.hypot((p.x - x0) * this.W, (p.y - y0) * this.H) / Math.max(8, tn - (f.t || tn - 16)) * 1000 / 1400;
+      f.t = tn; this.fspeed = Math.max(this.fspeed || 0, Math.min(1.5, sp));
       f.x = p.x; f.y = p.y; f.still = 0;
       this.wipe(x0, y0, f.x, f.y);
     }
@@ -487,7 +494,9 @@ void main() { o = texture(uSp, vT) * vA; }`;
         for (const q of this.near(wx, wy, wr + 14 * this.k)) { const ex = q.x - wx, ey = q.y - wy; if (!q.dead && ex * ex + ey * ey < wr * wr) q.dead = true; }
         if (len && Math.random() < 0.6) {
           const side = Math.random() < 0.5 ? -1 : 1, o = wr * rnd(0.92, 1.08);
+          this.quiet = true;
           const q = this.land(wx + nx * o * side, wy + ny * o * side, rnd(0.8, 2.2) * this.k * 1.33);
+          this.quiet = false;
           q.age = 1;
         }
       }
@@ -638,6 +647,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       const raw = now - this.last, dt = Math.min(0.05, raw / 1000);
       this.last = now;
       this.adapt(raw, now);
+      this.fspeed = (this.fspeed || 0) * Math.exp(-dt * 9);
       if (!this.o.reduce) this.step(dt);
       else if (this.finger) this.step(0);
       this.draw();

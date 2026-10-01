@@ -532,3 +532,7 @@ html:not([data-mode="focus"]) .voice { opacity: 0; }
 }
 /* once the live window has drawn, the blurred poster beneath it is never seen: stop painting it */
 .hero:has(.hero__rain.is-ready) .hero__poster { visibility: hidden; }
+/* the sound switch: a word beside the menu, with the site's one hover */
+.bar__end { display: flex; align-items: center; gap: 18px; }
+.bar__sound { height: 36px; padding: 0 2px; font: 500 11.5px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; color: inherit; background: none; border: 0; cursor: pointer; }
+@media (max-width: 899px) { .bar__end { gap: 12px; } }
