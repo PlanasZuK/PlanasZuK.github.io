@@ -31,10 +31,12 @@
   ];
   const LINES = {
     en: {
-      hello: "Hi. Press and drag to write on the glass. Anything. I’ll read it.",
+      hello: "Press and drag to write on the glass. Anything you like, I’ll read it.",
       reading: "Reading…",
       waking: (p) => (p > 2 ? `Hold on, my brain is waking up… ${p}%` : "Hold on, I’m waking up my brain…"),
       awake: "I’m awake. Write me anything.",
+      nobrain: "My AI brain needs a computer with a recent Chrome or Edge. Here, I answer from memory.",
+      broken: "My AI brain tripped over a raindrop. I’ll answer from memory for now.",
       work: "Going to show you my work…", about: "Let me tell you who I am…", services: "Here’s what I can do for you…", contact: "Let’s talk. Taking you there…",
       soon: ["That page is still drying. Come back very soon.", "Almost ready. I’m painting the last pixels.", "Not open yet. Even the rain is waiting for it."],
       hi: ["Hello! Lovely weather, isn’t it?", "Hi there. Mind the drops.", "Hello. You write nicely on wet glass."],
@@ -61,10 +63,12 @@
       blank: ["Your handwriting is… artistic. Try a bit bigger?", "I couldn’t read that. Even doctors write better.", "Was that a word or a drawing? Both are welcome."],
     },
     ca: {
-      hello: "Hola. Prem i arrossega per escriure al vidre. El que vulguis. Ho llegiré.",
+      hello: "Prem i arrossega per escriure al vidre. El que vulguis, ho llegiré.",
       reading: "Llegint…",
       waking: (p) => (p > 2 ? `Un moment, que desperto el cervell… ${p}%` : "Un moment, que desperto el cervell…"),
       awake: "Ja estic despert. Escriu-me el que vulguis.",
+      nobrain: "El meu cervell d’IA necessita un ordinador amb Chrome o Edge recent. Aquí responc de memòria.",
+      broken: "El meu cervell d’IA ha relliscat amb una gota. De moment responc de memòria.",
       work: "Anem a veure la meva feina…", about: "Et explico qui soc…", services: "Això és el que puc fer per tu…", contact: "Parlem. Et porto allà…",
       soon: ["Aquesta pàgina encara s’està assecant. Torna aviat.", "Gairebé a punt. Estic pintant els últims píxels.", "Encara no és oberta. Fins i tot la pluja l’espera."],
       hi: ["Hola! Quin temps més bo, oi?", "Hola. Compte amb les gotes.", "Hola. Escrius molt bé sobre vidre mullat."],
@@ -91,10 +95,12 @@
       blank: ["La teva lletra és… artística. Prova-ho una mica més gran?", "No ho he pogut llegir. Fins i tot els metges escriuen millor.", "Era una paraula o un dibuix? Tots dos són benvinguts."],
     },
     es: {
-      hello: "Hola. Pulsa y arrastra para escribir en el cristal. Lo que quieras. Lo leeré.",
+      hello: "Pulsa y arrastra para escribir en el cristal. Lo que quieras, lo leeré.",
       reading: "Leyendo…",
       waking: (p) => (p > 2 ? `Un momento, que despierto el cerebro… ${p}%` : "Un momento, que despierto el cerebro…"),
       awake: "Ya estoy despierto. Escríbeme lo que quieras.",
+      nobrain: "Mi cerebro de IA necesita un ordenador con Chrome o Edge reciente. Aquí respondo de memoria.",
+      broken: "Mi cerebro de IA ha resbalado con una gota. De momento respondo de memoria.",
       work: "Vamos a ver mi trabajo…", about: "Te cuento quién soy…", services: "Esto es lo que puedo hacer por ti…", contact: "Hablemos. Te llevo allí…",
       soon: ["Esa página aún se está secando. Vuelve pronto.", "Casi lista. Estoy pintando los últimos píxeles.", "Todavía no abre. Hasta la lluvia la espera."],
       hi: ["¡Hola! Qué buen tiempo hace, ¿eh?", "Hola. Cuidado con las gotas.", "Hola. Escribes muy bien sobre cristal mojado."],
@@ -157,8 +163,9 @@
       }
     }
     react(raw) { return this.theme(raw) || this.t("unknown", raw.trim()); }
-    say(text, hold = 3.2) {
+    say(text, hold = 3.2, kind = "") {
       const el = this.el;
+      this.showing = kind;
       if (this.tw) this.tw.kill();
       el.classList.add("is-on");
       const o = { n: 0 };
@@ -188,16 +195,18 @@
     }
     async wake() {
       if (this.brain) return;
-      this.brain = { ready: false, progress: 0, waiting: new Map(), n: 0 };
-      if (!(await this.eligible())) { this.brain.off = true; return; }
+      this.brain = { ready: false, progress: 0, waiting: new Map(), n: 0, status: "checking" };
+      window.__brain = this.brain;
+      if (!(await this.eligible())) { this.brain.off = true; this.brain.status = "not available on this device"; console.info("[cervell] not available: needs a computer with WebGPU"); return; }
+      console.info("[cervell] waking up");
       try {
         const w = new Worker("/assets/js/brain-worker.js", { type: "module" });
         this.brain.w = w;
         w.onmessage = (e) => {
           const m = e.data, b = this.brain;
-          if (m.type === "progress") b.progress = m.value;
-          if (m.type === "ready") { b.ready = true; if (!this.el.classList.contains("is-on")) this.say(this.t("awake"), 3.5); }
-          if (m.type === "error") b.off = true;
+          if (m.type === "progress") { b.progress = m.value; b.status = "downloading " + Math.round(m.value * 100) + "%"; if (this.showing === "waking") this.el.textContent = this.t("waking", Math.round(m.value * 100)); }
+          if (m.type === "ready") { b.ready = true; b.status = "ready"; console.info("[cervell] ready"); this.showing = ""; this.say(this.t("awake"), 3.5); }
+          if (m.type === "error") { b.off = true; b.status = "error: " + m.message; console.warn("[cervell] error", m.message); if (this.showing === "waking") { this.showing = ""; this.say(this.t("broken"), 4); } }
           if (m.type === "answer" && b.waiting.has(m.id)) { b.waiting.get(m.id)(m.text); b.waiting.delete(m.id); }
         };
         w.postMessage({ type: "load" });
@@ -207,8 +216,8 @@
       const b = this.brain, id = ++b.n;
       const msgs = [{ role: "system", content: FACTS[this.lang] }, ...SHOTS[this.lang].flatMap(([u, a]) => [{ role: "user", content: u }, { role: "assistant", content: a }]), ...this.history, { role: "user", content: text }];
       return Promise.race([
-        new Promise((res) => { b.waiting.set(id, res); b.w.postMessage({ type: "ask", id, messages: msgs, temperature: this.lang === "ca" ? 0.45 : 0.7 }); }),
-        new Promise((res) => setTimeout(() => res(""), 12000)),
+        new Promise((res) => { b.waiting.set(id, res); b.w.postMessage({ type: "ask", id, messages: msgs, temperature: this.lang === "ca" ? 0.6 : 0.7 }); }),
+        new Promise((res) => setTimeout(() => res(""), 20000)),
       ]);
     }
     async answer(text) {
@@ -217,13 +226,15 @@
       if (!this.brain) await this.wake();
       const b = this.brain;
       if (b && b.ready) {
-        const out = tidy(await this.think(text));
+        const raw = await this.think(text), out = tidy(raw);
+        console.info("[cervell]", JSON.stringify(text), "→", JSON.stringify(raw), out ? "" : "(discarded)");
         if (out) {
           this.history.push({ role: "user", content: text }, { role: "assistant", content: out });
           this.history = this.history.slice(-2);
           return { text: out, go: null };
         }
-      } else if (b && !b.off && b.w) return { text: this.t("waking", Math.round(b.progress * 100)), go: null };
+      } else if (b && !b.off && b.w) return { text: this.t("waking", Math.round(b.progress * 100)), go: null, waking: true };
+      if (b && b.off && !this.toldOff) { this.toldOff = true; return { text: this.t(b.status.startsWith("error") ? "broken" : "nobrain"), go: null }; }
       return { text: this.t("unknown", text), go: null };
     }
   }

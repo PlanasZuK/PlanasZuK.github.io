@@ -194,6 +194,12 @@ html:not(.js) .board--home { order: -1; }
 .touch.is-on .touch__ring { opacity: 1; scale: 1; }
 .touch.is-down .touch__ring { background: rgba(242, 243, 236, 0.1); border-color: rgba(242, 243, 236, 0.9); }
 @media (pointer: coarse) { .touch { display: none; } .hero__rain { cursor: auto; } }
+/* the voice beside the fingertip: a small dark glass label, readable on any light */
+.voice { position: fixed; left: 0; top: 0; z-index: 94; max-width: 300px; margin: 0; padding: 9px 12px 10px; font: 500 15px/1.3 var(--f2); letter-spacing: -0.005em; text-transform: none; color: #f4f5ef; background: rgba(12, 16, 13, 0.52); border: 1px solid rgba(244, 245, 239, 0.16); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); pointer-events: none; opacity: 0; transition: opacity 0.5s; }
+.voice.is-on { opacity: 1; }
+.voice:empty { display: none; }
+html:not([data-mode="focus"]) .voice { opacity: 0; }
+@media (pointer: coarse) { .voice { left: 50% !important; top: auto !important; bottom: 30%; translate: -50% 0; transform: none !important; text-align: center; max-width: 84vw; } }
 
 /* ---------- work: only the work ---------- */
 .wk { position: relative; height: 100svh; display: flex; flex-direction: column; padding: var(--bar) var(--m) var(--m); overflow: hidden; }

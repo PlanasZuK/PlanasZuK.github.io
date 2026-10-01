@@ -406,25 +406,28 @@
         if (mode !== "focus" || busy || !voice) return;
         if (!cands.length) { voice.say(voice.t("blank")); return; }
         const a = await voice.answer(cands[0]);
-        if (a && a.text) { if (a.go) take(a.go, a.text); else voice.say(a.text, 4.5); }
+        if (a && a.text) { if (a.go) take(a.go, a.text); else voice.say(a.text, a.waking ? 30 : 4.5, a.waking ? "waking" : ""); }
         else voice.say(voice.t("unknown", cands[0]), 4);
       },
     }) : null;
-    let fresh = true;
-    try { fresh = !sessionStorage.getItem("pp-wiped"); } catch (e) {}
+    let wrote = false, lastHint = 0;
+    const introEnd = performance.now() + (reduce ? 800 : 4600);
     el.addEventListener("pointerdown", (e) => {
       if (e.pointerType !== "mouse" || e.button || !live() || mode !== "focus") return;
       if (rain.down(e.clientX, e.clientY)) {
         tip.classList.add("is-down");
         if (ink) ink.down(e.clientX, e.clientY);
-        if (fresh) { fresh = false; if (voice) voice.hush(); try { sessionStorage.setItem("pp-wiped", "1"); } catch (x) {} }
+        if (!wrote) { wrote = true; if (voice) voice.hush(); }
       }
     });
     addEventListener("pointermove", (e) => {
       if (e.pointerType !== "mouse" || !live()) return;
       rain.move(e.clientX, e.clientY);
       if (ink && rain.finger) ink.move(e.clientX, e.clientY);
-      tip.classList.toggle("is-on", mode === "focus" && !!e.target.closest(".hero"));
+      const over = mode === "focus" && !!e.target.closest(".hero");
+      tip.classList.toggle("is-on", over);
+      // until someone writes, the voice keeps inviting them to
+      if (over && !wrote && voice && !vEl.classList.contains("is-on") && performance.now() - lastHint > 9000 && performance.now() > introEnd) { lastHint = performance.now(); voice.say(voice.t("hello"), 5); }
       const d = Math.round(rain.fingerRadius() * 2);
       if (tip._d !== d) { tip._d = d; Object.assign(tip.style, { width: d + "px", height: d + "px", margin: `${-d / 2}px 0 0 ${-d / 2}px` }); }
       tx(e.clientX); ty(e.clientY);
@@ -501,7 +504,7 @@
       }
     });
     // the voice says hello once the landing has settled
-    if (voice && fresh) gsap.delayedCall(reduce ? 1 : 4.6, () => { if (mode === "focus" && fresh) voice.say(voice.t("hello"), 6); });
+    if (voice) gsap.delayedCall(reduce ? 1 : 4.6, () => { if (mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.t("hello"), 6); } });
     return { rain, day, wiping: () => wiping };
   })();
 

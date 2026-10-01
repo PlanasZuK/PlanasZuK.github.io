@@ -12,7 +12,7 @@ self.onmessage = async (e) => {
   if (type === "load" && !gen) {
     try {
       gen = await pipeline("text-generation", MODEL, {
-        device: "webgpu", dtype: "q4f16",
+        device: "webgpu", dtype: "q4", // full-precision maths: the fp16 build overflows on many graphics cards
         progress_callback: (p) => {
           if (p.status !== "progress" || !p.total) return;
           files.set(p.file, [p.loaded, p.total]);
@@ -21,13 +21,15 @@ self.onmessage = async (e) => {
           self.postMessage({ type: "progress", value: b ? a / b : 0 });
         },
       });
+      // a first tiny answer compiles the graphics-card programs, so the first real one is quick
+      await gen([{ role: "user", content: "hi" }], { max_new_tokens: 4 });
       self.postMessage({ type: "ready" });
     } catch (err) { self.postMessage({ type: "error", message: String(err && err.message || err) }); }
   }
   if (type === "ask") {
     if (!gen) { self.postMessage({ type: "answer", id, text: "" }); return; }
     try {
-      const r = await gen(messages, { max_new_tokens: 44, do_sample: true, temperature: e.data.temperature || 0.7, top_p: 0.9, repetition_penalty: 1.1 });
+      const r = await gen(messages, { max_new_tokens: 36, do_sample: true, temperature: e.data.temperature || 0.7, top_p: 0.9, repetition_penalty: 1.1 });
       self.postMessage({ type: "answer", id, text: r[0].generated_text.at(-1).content || "" });
     } catch (err) { self.postMessage({ type: "answer", id, text: "" }); }
   }
