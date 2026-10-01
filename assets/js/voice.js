@@ -35,7 +35,7 @@
   ];
   const LINES = {
     en: {
-      hello: "Press and drag to write on the glass. Anything you like, I’ll read it.",
+      hello: "Write anything with your finger!",
       reading: "Reading…",
       offerServices: "Want me to show you what’s included? Write “yes”.",
       offerWork: "Want to see some of my work? Write “yes”.",
@@ -74,7 +74,7 @@
       blank: ["Your handwriting is… artistic. Try a bit bigger?", "I couldn’t read that. Even doctors write better.", "Was that a word or a drawing? Both are welcome."],
     },
     ca: {
-      hello: "Prem i arrossega per escriure al vidre. El que vulguis, ho llegiré.",
+      hello: "Escriu el que vulguis amb el dit!",
       reading: "Llegint…",
       offerServices: "Vols que t’ensenyi què inclou? Escriu “sí”.",
       offerWork: "Vols veure una mica de la meva feina? Escriu “sí”.",
@@ -113,7 +113,7 @@
       blank: ["La teva lletra és… artística. Prova-ho una mica més gran?", "No ho he pogut llegir. Fins i tot els metges escriuen millor.", "Era una paraula o un dibuix? Tots dos són benvinguts."],
     },
     es: {
-      hello: "Pulsa y arrastra para escribir en el cristal. Lo que quieras, lo leeré.",
+      hello: "¡Escribe lo que quieras con el dedo!",
       reading: "Leyendo…",
       offerServices: "¿Quieres que te enseñe qué incluye? Escribe “sí”.",
       offerWork: "¿Quieres ver un poco de mi trabajo? Escribe “sí”.",

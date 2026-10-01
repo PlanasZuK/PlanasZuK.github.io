@@ -408,8 +408,7 @@
       onWord: (target, word, cands) => handle(cands[0] || word, target),
       onRead: (cands) => (cands.length ? handle(cands[0]) : voice && voice.say(voice.t("blank"), 3.5)),
     }) : null;
-    let wrote = false, lastHint = 0;
-    const introEnd = performance.now() + (reduce ? 800 : 4600);
+    let wrote = false, lastHint = 0, introEnd = Infinity;
     el.addEventListener("pointerdown", (e) => {
       if (e.pointerType !== "mouse" || e.button || !live() || mode !== "focus") return;
       if (rain.down(e.clientX, e.clientY)) {
@@ -502,10 +501,14 @@
       }
     });
     // the voice says hello once the landing has settled
-    if (voice) gsap.delayedCall(reduce ? 1 : 4.6, () => { if (mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.t("hello"), 6); } });
+    // once everything has loaded and settled, the voice says hello
+    const greet = () => gsap.delayedCall(reduce ? 0.3 : 1.5, () => {
+      introEnd = performance.now();
+      if (voice && mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.t("hello"), 6); }
+    });
     // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
     if (voice && !/[?&]nobrain\b/.test(location.search)) voice.wake();
-    return { rain, day, voice, wiping: () => wiping };
+    return { rain, day, voice, greet, wiping: () => wiping };
   })();
 
   /* ---------------- the preview that follows the pointer over lists ---------------- */
@@ -908,8 +911,8 @@
     fitAll();
     if (r0.page === "home") {
       // with a loading screen, the landing's entrance is set up underneath it, paused, and plays once when it lifts
-      if ($("#loader")) { const tl = intro(true, true); load(tl).then(() => { if (!tl) gsap.set("[data-intro]", { visibility: "visible" }); }); }
-      else intro();
+      if ($("#loader")) { const tl = intro(true, true); load(tl).then(() => { if (!tl) gsap.set("[data-intro]", { visibility: "visible" }); if (hero.greet) hero.greet(); }); }
+      else { intro(); if (hero.greet) gsap.delayedCall(3, hero.greet); }
     } else { gsap.set("[data-intro]", { visibility: "visible" }); if (hero.rain) hero.rain.set("expo", 1); }
     if (r0.slug) openCase(r0.slug, false);
     ScrollTrigger.refresh();
