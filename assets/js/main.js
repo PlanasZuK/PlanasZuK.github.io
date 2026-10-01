@@ -682,51 +682,45 @@
     } });
   };
 
-  /* ---------------- work: the darkroom. The scroll pulls the cord; the print under the lamp is the one you read ---------------- */
+  /* ---------------- work: the clothesline. The scroll pulls the cord; the print in the middle is the one you read ---------------- */
   const dark = (() => {
-    const sec = $(".dark");
+    const sec = $(".cord");
     const none = { enter() {}, key() {}, still() {}, rect() { return null; }, tick() {} };
     if (!sec) return none;
-    const c = $(".dark__gl", sec), items = JSON.parse($(".dark__data", sec).textContent), N = items.length;
-    const dr = window.Darkroom && Darkroom.supported ? new Darkroom(c, items, { reduce }) : null;
+    const c = $(".cord__gl", sec), items = JSON.parse($(".cord__data", sec).textContent), N = items.length;
+    const dr = window.Clothesline && Clothesline.supported ? new Clothesline(c, items, { reduce, sky: c.dataset.sky }) : null;
     if (!dr || !dr.ok) { sec.classList.add("no-gl"); return none; }
-    const word = $(".dark__word", sec), nEl = $(".dark__n", sec), kEl = $(".dark__k", sec), open = $(".dark__open", sec), openRoll = $(".btn__roll", open);
+    if (/[?&]test(&|$)/.test(location.search)) window.__cl = dr;
+    const label = $(".cord__label", sec), open = $(".cord__open", sec), openRoll = $(".btn__roll", open);
     const contactOpen = !isLocked("contact"), pad = (n) => String(n).padStart(2, "0");
-    let idx = 0, fresh = true, snapT = 0, drag = null, dragged = false, lastP = 0;
+    let idx = 0, fresh = true, snapT = 0, drag = null, dragged = false, typer = null;
     const live = () => mode === "page" && current === "work" && !caseOpen && !busy;
     // scroll ↔ print: the section starts at the top of the page, and each print takes the same stretch of it
     const range = () => Math.max(1, sec.offsetHeight - innerHeight);
     const top = () => sec.getBoundingClientRect().top + window.scrollY;
     const yFor = (i) => top() + (Math.max(0, Math.min(N - 1, i)) / (N - 1)) * range();
     const progress = () => clamp((window.scrollY - top()) / range()) * (N - 1);
-    const to = (y, immediate) => { if (lenis) lenis.scrollTo(y, immediate ? { immediate: true, force: true } : { duration: 1.1, easing: (t) => 1 - Math.pow(1 - t, 4), force: true }); else window.scrollTo({ top: y, behavior: immediate || reduce ? "auto" : "smooth" }); };
+    const to = (y, immediate) => { if (lenis) lenis.scrollTo(y, immediate ? { immediate: true, force: true } : { duration: 1.2, easing: (t) => 1 - Math.pow(1 - t, 4), force: true }); else window.scrollTo({ top: y, behavior: immediate || reduce ? "auto" : "smooth" }); };
     const goTo = (i) => to(yFor(i));
-    // the caption under the cord: the name leaves the way the cord moves and the next one comes in behind it
-    function show(i, dir) {
+    // the line above the title says which print is in the middle; it writes itself in, like the hour on the landing
+    const labelOf = (i) => `${pad(i + 1)}/${pad(N)}   ${items[i].name}${items[i].kind ? " — " + items[i].kind : ""}`;
+    function show(i) {
       if (i === idx) return;
       const it = items[i];
       idx = i;
-      nEl.textContent = pad(i + 1); kEl.textContent = it.kind;
       open.href = it.href; open.classList.toggle("is-blank", !it.slug);
       if (it.slug) { open.dataset.case = it.slug; delete open.dataset.go; } else { delete open.dataset.case; if (contactOpen) open.dataset.go = "contact"; }
-      const label = it.cta || sec.dataset.labelOpen;
-      openRoll.textContent = label; openRoll.dataset.text = label;
-      if (reduce) { word.textContent = it.name; return; }
-      // passing several prints quickly: the name only ever comes in, never gets stuck on its way out
-      const busyWord = gsap.isTweening(word);
-      gsap.killTweensOf(word);
-      const enter = () => { word.textContent = it.name; gsap.fromTo(word, { yPercent: dir > 0 ? 110 : -110 }, { yPercent: 0, duration: 1, ease: EO }); };
-      if (busyWord) enter();
-      else gsap.to(word, { yPercent: dir > 0 ? -110 : 110, duration: 0.3, ease: "power2.in", onComplete: enter });
+      const l = it.cta || sec.dataset.labelOpen;
+      if (openRoll.textContent !== l) { openRoll.textContent = l; openRoll.dataset.text = l; }
+      const text = labelOf(i);
+      if (typer) typer.kill();
+      if (reduce) { label.textContent = text; return; }
+      const o = { n: 0 }, dur = Math.min(0.7, 0.018 * text.length + 0.1);
+      typer = gsap.to(o, { n: text.length, duration: dur, ease: "none", onUpdate: () => { label.textContent = text.slice(0, Math.ceil(o.n)) || " "; } });
+      if (window.Sound) Sound.typeKeys(Math.min(18, text.length), dur);
     }
-    function update() {
-      const p = progress();
-      dr.setProgress(p);
-      const i = Math.round(p);
-      if (i !== idx) show(i, p > lastP ? 1 : -1);
-      lastP = p;
-    }
-    // when the cord stops, it settles with the nearest print under the lamp
+    const update = () => { const p = progress(); dr.setProgress(p); show(Math.round(p)); };
+    // when the cord stops, it settles with the nearest print in the middle
     const snap = () => { if (!live() || drag) return; const p = progress(), i = Math.round(p); if (Math.abs(p - i) > 0.003) goTo(i); };
     addEventListener("scroll", () => { if (!live()) return; update(); clearTimeout(snapT); snapT = setTimeout(snap, 170); }, { passive: true });
     // a mouse can also take the cord and pull it sideways; a finger can swipe it
@@ -747,7 +741,7 @@
         if (dragged) pull(dx);
         return;
       }
-      if (e.pointerType !== "mouse" || !e.target.closest || e.target !== c) { if (dr.hover !== -1) { dr.hover = -1; sec.classList.remove("is-over"); cursor.hide(); } return; }
+      if (e.pointerType !== "mouse" || e.target !== c) { if (dr.hover !== -1) { dr.hover = -1; sec.classList.remove("is-over"); cursor.hide(); } return; }
       const h = dr.hit(x, y);
       if (h !== dr.hover) {
         dr.hover = h;
@@ -778,13 +772,13 @@
       if (tx.h) window.scrollTo(0, tx.sy - (dx / Math.max(200, innerWidth * 0.7)) * (range() / (N - 1)));
     }, { passive: true });
     c.addEventListener("touchend", () => { tx = null; }, { passive: true });
-    // the list behind it, for the keyboard and for screen readers: focusing a print brings it to the lamp
-    $$(".dark__list a", sec).forEach((a) => a.addEventListener("focus", () => { if (live()) goTo(+a.dataset.i); }));
+    // the list behind it, for the keyboard and for screen readers: focusing a print brings it to the middle
+    $$(".cord__list a", sec).forEach((a) => a.addEventListener("focus", () => { if (live()) goTo(+a.dataset.i); }));
     return {
       enter() {
-        // the first time in, everything is still blank paper and the first print develops in front of you
+        // the first time in, the prints are still blank paper and the first one develops in front of you
         if (fresh) { fresh = false; dr.P.forEach((p) => { p.dev = 0; p.seen = 0; }); dr.fade = 0; }
-        dr.size(); idx = -1; lastP = progress(); update(); idx = Math.round(progress()); show(idx, 1);
+        dr.size(); idx = -1; update();
       },
       key(dir) { goTo(idx + dir); },
       still() { dr.active = false; dr.still(true); },

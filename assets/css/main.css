@@ -50,10 +50,10 @@ ul, ol { padding: 0; list-style: none; }
 .mk { display: inline-block; overflow: clip; vertical-align: bottom; padding-bottom: 0.08em; margin-bottom: -0.08em; }
 .mk > span { display: inline-block; }
 /* type: one giant face for the H1s, a tight grotesk for everything that is a heading, a mono for text */
-.phero__title, .hello, .nextrow__word, .case__title, .dark__name, .case__next-name, .direct__mail, .legal__title, .nf__title, .done__title {
+.phero__title, .hello, .nextrow__word, .case__title, .case__next-name, .direct__mail, .legal__title, .nf__title, .done__title {
   font-family: var(--f); font-weight: 800; font-stretch: 112%; text-transform: uppercase; letter-spacing: -0.035em; line-height: 0.86;
 }
-.pack__name, .pack__price, .drow__name, .endline__txt, .truth__big, .case__line, .case__goal p, .dev__proof, .hero__line, .care__price {
+.pack__name, .pack__price, .drow__name, .endline__txt, .truth__big, .case__line, .case__goal p, .dev__proof, .hero__line, .cord__title, .care__price {
   font-family: var(--f2); font-weight: 700; text-transform: uppercase; letter-spacing: -0.03em; line-height: 0.95;
 }
 .say__text, .how__text, .madlib__text, .qrow__q { font-family: var(--f2) !important; font-weight: 600 !important; }
@@ -183,8 +183,8 @@ html:not(.js) .board--home { order: -1; }
 .hero__rain { cursor: none; }
 .hero__title { position: absolute; left: 50%; top: 50%; width: min(24vw, 420px); translate: -50% -58%; pointer-events: none; }
 .hero__logo { fill: currentColor; }
-.hero__foot { position: absolute; left: var(--m); bottom: var(--m); max-width: min(34vw, 520px); pointer-events: none; }
-.hero__line { font-size: clamp(17px, 1.45vw, 26px); line-height: 1.02; text-wrap: balance; }
+.hero__foot { position: absolute; left: var(--m); bottom: var(--m); max-width: min(46vw, 760px); pointer-events: none; }
+.hero__line, .cord__title { font-size: clamp(21px, 2.1vw, 40px); line-height: 1; text-wrap: balance; }
 .hero__foot { display: grid; gap: 12px; }
 .hero__sky { opacity: 0.62; min-height: 1.35em; }
 .js:not(.reduced) [data-intro] { visibility: hidden; }
@@ -221,39 +221,35 @@ html:not(.js) .board--home { order: -1; }
 html:not([data-mode="focus"]) .voice { opacity: 0; }
 @media (pointer: coarse) { .voice { left: 50% !important; top: auto !important; bottom: 30%; translate: -50% 0; transform: none !important; text-align: center; max-width: 84vw; } }
 
-/* ---------- work: the darkroom ---------- */
-/* one still room; the scroll only pulls the cord, so the section is as tall as the cord is long */
-.page--work { --bg: #070606; }
-.dark { position: relative; height: calc(100svh + (var(--n) - 1) * 62svh); }
-.dark__stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #070606; }
-.dark__gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
-.dark.is-drag .dark__gl { cursor: grabbing; }
-.dark.is-over .dark__gl { cursor: pointer; }
-.dark__cap { position: absolute; left: var(--m); right: var(--m); bottom: var(--m); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--gap); pointer-events: none; }
-.dark__name { margin: 0 0 -0.075em -0.045em; padding-top: 0.1em; font-size: clamp(64px, 12vw, 236px); white-space: nowrap; overflow: clip; }
-.dark__word { display: inline-block; will-change: transform; }
-.dark__side { display: grid; justify-items: end; gap: 14px; padding-bottom: 0.5vw; text-align: right; pointer-events: auto; }
-.dark__kind { display: flex; gap: 1.2em; justify-content: flex-end; white-space: nowrap; }
-.dark__c { white-space: nowrap; }
-.dark__k { opacity: 0.6; }
-.dark__open { color: var(--wh); }
-.dark__open.is-blank { background: var(--wh); color: var(--bk); border-color: var(--wh); --ink: var(--wh); }
-.dark__list { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; padding: 0; list-style: none; }
-.dark:has(.dark__list a:focus-visible) .dark__open { outline: 2px solid var(--wh); outline-offset: 4px; }
+/* ---------- work: the clothesline ---------- */
+/* one still view of the sky; the scroll only pulls the cord, so the section is as tall as the cord is long */
+.page--work { --bg: #0b0d0c; }
+.cord { position: relative; height: calc(100svh + (var(--n) - 1) * 62svh); }
+.cord__stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #6d7f8a; color: #f2f3ec; }
+.cord__gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
+.cord.is-drag .cord__gl { cursor: grabbing; }
+.cord.is-over .cord__gl { cursor: pointer; }
+.cord__foot { position: absolute; left: var(--m); bottom: var(--m); display: grid; gap: 12px; max-width: min(46vw, 760px); pointer-events: none; }
+.cord__label { margin: 0; min-height: 1.35em; opacity: 0.72; white-space: pre; }
+.cord__title { margin: 0; }
+.cord__open { position: absolute; right: var(--m); bottom: var(--m); color: #f2f3ec; }
+.cord__open.is-blank { background: #f2f3ec; color: var(--bk); border-color: #f2f3ec; --ink: #f2f3ec; }
+.cord__list { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; padding: 0; list-style: none; }
+.cord:has(.cord__list a:focus-visible) .cord__open { outline: 2px solid #f2f3ec; outline-offset: 4px; }
 html[data-route="work"][data-mode="page"] .vcard { translate: 0 calc(100% + 40px); opacity: 0; pointer-events: none; }
+html[data-route="work"][data-mode="page"] .bar { mix-blend-mode: normal; color: #f2f3ec; }
 /* without the graphics card (or without scripts) the work is a plain row of prints */
-html:not(.js) .dark, .dark.no-gl { height: auto; }
-html:not(.js) .dark__stage, .dark.no-gl .dark__stage { position: relative; height: auto; padding: calc(var(--bar) + 4vh) var(--m) 0; background: none; }
-html:not(.js) .dark__gl, html:not(.js) .dark__cap, .dark.no-gl .dark__gl, .dark.no-gl .dark__cap { display: none; }
-html:not(.js) .dark__list, .dark.no-gl .dark__list { position: static; width: auto; height: auto; clip-path: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--gap); padding: 0 var(--m) 10vh; }
-.dark.no-gl .dark__list a, html:not(.js) .dark__list a { display: grid; gap: 8px; }
-.dark.no-gl .dark__list img, .dark.no-gl .dark__list i, html:not(.js) .dark__list img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: #ecebe8; }
-.dark.no-gl .dark__list b, html:not(.js) .dark__list b { font: 700 22px/1 var(--f2); text-transform: uppercase; letter-spacing: -0.03em; }
+html:not(.js) .cord, .cord.no-gl { height: auto; }
+html:not(.js) .cord__stage, .cord.no-gl .cord__stage { position: relative; height: auto; min-height: 100svh; padding: calc(var(--bar) + 4vh) var(--m) 0; }
+html:not(.js) .cord__gl, .cord.no-gl .cord__gl { display: none; }
+html:not(.js) .cord__list, .cord.no-gl .cord__list { position: relative; z-index: 1; width: auto; height: auto; clip-path: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--gap); padding: 0 var(--m) 30vh; }
+.cord.no-gl .cord__list a, html:not(.js) .cord__list a { display: grid; gap: 8px; color: #f2f3ec; }
+.cord.no-gl .cord__list img, .cord.no-gl .cord__list i, html:not(.js) .cord__list img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; background: #ecebe8; }
+.cord.no-gl .cord__list b, html:not(.js) .cord__list b { font: 700 22px/1 var(--f2); text-transform: uppercase; letter-spacing: -0.03em; }
 @media (max-width: 899px) {
-  .dark__cap { grid-template-columns: 1fr; gap: 12px; }
-  .dark__name { font-size: 17vw; }
-  .dark__side { justify-items: start; text-align: left; grid-template-columns: 1fr auto; align-items: center; width: 100%; }
-  .dark__kind { justify-content: flex-start; flex-direction: column; gap: 4px; white-space: normal; }
+  .cord__foot { right: var(--m); bottom: calc(var(--m) + 58px); max-width: none; }
+  .cord__label { white-space: normal; }
+  .cord__open { left: var(--m); right: auto; }
 }
 
 /* the client's homepage, in the case study */
