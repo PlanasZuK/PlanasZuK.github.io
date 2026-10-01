@@ -467,7 +467,7 @@
       if (!voice || mode !== "focus") return;
       played++;
       const now = performance.now();
-      if (played >= 3 && now - nudged > 25000 && !vEl.classList.contains("is-on")) { nudged = now; played = 0; voice.say(voice.t("hello"), 4.5); }
+      if (played >= 2 && now - nudged > 20000 && !vEl.classList.contains("is-on")) { nudged = now; played = 0; voice.say(voice.nudge(), 5); }
     };
     const handle = async (input) => {
       if (mode !== "focus" || busy || !voice) return;
@@ -507,7 +507,7 @@
       const over = mode === "focus" && !!e.target.closest(".hero");
       tip.classList.toggle("is-on", over);
       // until someone writes, the voice keeps inviting them to
-      if (over && !wrote && hints < 2 && voice && !vEl.classList.contains("is-on") && performance.now() - lastHint > 9000 && performance.now() > introEnd) { lastHint = performance.now(); hints++; voice.say(voice.t("hello"), 5); }
+      if (over && !wrote && hints < 2 && voice && !vEl.classList.contains("is-on") && performance.now() - lastHint > 9000 && performance.now() > introEnd) { lastHint = performance.now(); hints++; voice.say(voice.step ? voice.nudge() : voice.opener(), 5.5); }
       const d = Math.round(rain.fingerRadius() * 2);
       if (tip._d !== d) { tip._d = d; Object.assign(tip.style, { width: d + "px", height: d + "px", margin: `${-d / 2}px 0 0 ${-d / 2}px` }); }
       tx(e.clientX); ty(e.clientY);
@@ -595,7 +595,7 @@
     const greet = () => gsap.delayedCall(reduce ? 0.3 : 1.5, () => {
       introEnd = performance.now();
       DAY.run = true;
-      if (voice && mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.t("hello"), 6); }
+      if (voice && mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.opener(), 7.5); }
     });
     // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
     if (voice && !/[?&]nobrain\b/.test(location.search)) voice.wake();
