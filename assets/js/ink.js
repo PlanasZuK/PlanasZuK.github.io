@@ -37,8 +37,8 @@
     return best;
   }
   class Ink {
-    constructor({ lang = "en", onWord, onRead, onReading, delay = 1900 }) {
-      this.lang = lang; this.onWord = onWord; this.onRead = onRead; this.onReading = onReading; this.delay = delay;
+    constructor({ lang = "en", onInk, onReading, delay = 1900 }) {
+      this.lang = lang; this.onInk = onInk; this.onReading = onReading; this.delay = delay;
       this.strokes = []; this.cur = null; this.timer = null; this.t0 = 0; this.busy = false;
     }
     down(x, y) {
@@ -67,20 +67,28 @@
       if (w < 24 || h > innerHeight * 0.92) return;
       this.busy = true;
       if (this.onReading) this.onReading();
+      // the same strokes go to two of Google's recognisers at once: handwriting, and drawings (the AutoDraw one)
+      const ask = async (app, language, extra = {}) => {
+        try {
+          const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 4000);
+          const r = await fetch(`https://inputtools.google.com/request?ime=handwriting&app=${app}&cs=1&oe=UTF-8`, {
+            method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...extra, requests: [{ writing_guide: { writing_area_width: Math.round(w + 40), writing_area_height: Math.round(h + 40) }, ink, language, max_num_results: 10 }] }),
+          });
+          clearTimeout(t);
+          const j = await r.json();
+          return j[0] === "SUCCESS" ? j[1][0][1] : [];
+        } catch (e) { return []; }
+      };
       try {
-        const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 4000);
         const lang = { ca: "ca", es: "es" }[this.lang] || "en";
-        const r = await fetch("https://inputtools.google.com/request?ime=handwriting&app=mobilesearch&cs=1&oe=UTF-8", {
-          method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ options: "enable_pre_space", requests: [{ writing_guide: { writing_area_width: innerWidth, writing_area_height: innerHeight }, ink, language: lang, max_num_results: 10 }] }),
-        });
-        clearTimeout(t);
-        const j = await r.json();
-        const cands = j[0] === "SUCCESS" ? j[1][0][1] : [];
-        const m = match(cands);
-        if (m && this.onWord) this.onWord(m.target, m.word, cands);
-        else if (this.onRead) this.onRead(cands);
-      } catch (e) { if (this.onRead) this.onRead([]); } finally { this.busy = false; }
+        const [text, draw] = await Promise.all([ask("mobilesearch", lang, { options: "enable_pre_space" }), ask("autodraw", "autodraw", { input_type: 0 })]);
+        const m = match(text);
+        // real writing reads the same way several times ("hi", "Hi", "hin"); a drawing reads as scattered guesses
+        const top = clean(text[0] || ""), near = text.slice(1, 5).filter((c) => lev(clean(c), top) <= 1).length;
+        const textual = !!m || (top.length >= 2 && near >= 2);
+        if (this.onInk) this.onInk({ text, draw, aspect: w / Math.max(1, h), strokes: ink.length, match: m, textual });
+      } finally { this.busy = false; }
     }
   }
   Ink.match = match;

@@ -74,7 +74,9 @@
   // Z.v: 0 = inside the centre page, 1 = every page in view. The centre is the page you leave or enter.
   const Z = { v: 0, t: 0, tw: null, center: "home" };
   // the landing's own clock: scrolling first takes the day from afternoon to night, then pulls the camera back
-  const DAY = { v: 0, t: 0 };
+  // t: where the scroll has put the day (07:00 → 00:00); n: the small hours after midnight, until it is morning again
+  const DAY = { v: 0, t: 0, n: 0, nv: 0, run: false, last: 0 };
+  const NIGHT = 7 / 17; // 00:00 → 07:00, in the same units as 07:00 → 00:00
   function render() {
     const e = Z.v, c = boards[Z.center];
     cam.s = 1 + (L.s0 - 1) * e;
@@ -247,6 +249,7 @@
       return;
     }
     if (Z.center === "home") {
+      if (DAY.n > 0 && dy < 0 && Z.t === 0) { DAY.n = Math.max(0, DAY.n + dy / (L.ZR * (hero.rain ? hero.rain.P.dayLength : 2.4))); return; }
       // one scroll, two stretches: the day goes by first (0 → 1), then the camera pulls back (1 → 2)
       const base = Z.t > 0 ? 1 + Z.t : DAY.t;
       let u = base + dy / (L.ZR * (base < 1 || (dy < 0 && base <= 1) ? (hero.rain ? hero.rain.P.dayLength : 2.4) : 1));
@@ -268,8 +271,23 @@
     const dd = DAY.t - DAY.v;
     if (Math.abs(dd) > 0.0002) DAY.v += dd * (reduce ? 1 : 0.06); else DAY.v = DAY.t;
     // whenever the pages are in view, it is night on the landing
-    if (Z.v > 0.02 && DAY.t < 1) DAY.t = 1;
-    if (hero.day) hero.day(DAY.v);
+    if (Z.v > 0.02) { if (DAY.t < 1) DAY.t = 1; DAY.n = 0; }
+    // and while someone stays on the landing, time passes on its own: the whole day in a few minutes
+    const now = performance.now(), dt = Math.min(0.1, (now - (DAY.last || now)) / 1000);
+    DAY.last = now;
+    const per = hero.rain ? hero.rain.P.clock : 3;
+    if (DAY.run && per > 0 && mode === "focus" && Z.center === "home" && Z.t === 0 && Z.v === 0 && !busy) {
+      // real hours at an even pace: 24 of them in `clock` minutes
+      const d = DAY.v + DAY.nv, step = (dt * 24) / (per * 60) / (hero.slope ? hero.slope(d) : 17);
+      if (DAY.t < 1) { DAY.t = Math.min(1, DAY.t + step); DAY.v = Math.min(DAY.t, DAY.v + step); }
+      else if (DAY.v > 0.999) {
+        DAY.n += step;
+        // morning again: the scroll starts over from here
+        if (DAY.n >= NIGHT) DAY.t = DAY.v = DAY.n = DAY.nv = 0;
+      }
+    }
+    DAY.nv += (DAY.n - DAY.nv) * (Math.abs(DAY.n - DAY.nv) > 0.02 ? (reduce ? 1 : 0.06) : 1);
+    if (hero.day) hero.day(DAY.v + DAY.nv);
     if (Z.tw || busy) return;
     const dz = Z.t - Z.v;
     if (Math.abs(dz) > 0.0004) { Z.v += dz * (reduce ? 1 : 0.13); render(); }
@@ -393,9 +411,9 @@
       if (k === "rain") gsap.timeline().to(rain.state, { storm: 1, duration: 2, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 5, ease: "sine.inOut" }, "+=10");
     };
     // every turn of the conversation goes through here
-    const handle = async (text, target = null) => {
+    const handle = async (input) => {
       if (mode !== "focus" || busy || !voice) return;
-      const a = await voice.answer(text, target);
+      const a = await voice.answer(input);
       if (!a || !a.text || mode !== "focus") return;
       const hold = Math.min(9, 2.4 + a.text.length / 22);
       if (a.fx) effect(a.fx);
@@ -405,8 +423,7 @@
     };
     const ink = window.Ink ? new Ink({ lang: LANG,
       onReading: () => voice && voice.typing(20),
-      onWord: (target, word, cands) => handle(cands[0] || word, target),
-      onRead: (cands) => (cands.length ? handle(cands[0]) : voice && voice.say(voice.t("blank"), 3.5)),
+      onInk: (input) => { if (window.__pp) (window.__inks = window.__inks || []).push(input); handle(input); },
     }) : null;
     let wrote = false, lastHint = 0, introEnd = Infinity;
     el.addEventListener("pointerdown", (e) => {
@@ -452,7 +469,12 @@
       { at: 0.62, h: 19, sat: 0.98, bright: 0.72, contrast: 1.1, tint: [1.24, 0.86, 0.62], lift: [0.02, 0.008, 0], glow: [0.2, 0.08, 0.02], night: 0 },
       { at: 0.81, h: 21, sat: 0.62, bright: 0.36, contrast: 0.96, tint: [0.64, 0.72, 1.02], lift: [0.004, 0.008, 0.022], glow: [0.02, 0.012, 0.035], night: 0.6 },
       { at: 1, h: 24, sat: 0.5, bright: 0.14, contrast: 1, tint: [0.56, 0.68, 1], lift: [0.002, 0.004, 0.011], glow: [0, 0, 0], night: 1 },
+      { at: 1 + 5 / 17, h: 29, sat: 0.5, bright: 0.14, contrast: 1, tint: [0.56, 0.68, 1], lift: [0.002, 0.004, 0.011], glow: [0, 0, 0], night: 1 },
+      { at: 1 + 6 / 17, h: 30, sat: 0.56, bright: 0.38, contrast: 0.94, tint: [0.86, 0.84, 1.02], lift: [0.014, 0.014, 0.024], glow: [0.06, 0.03, 0.03], night: 0.35 },
     ];
+    KEYS.push({ ...KEYS[0], at: 1 + 7 / 17, h: 31 });
+    // hours per unit of day progress around d
+    const slope = (d) => { let i = 0; while (i < KEYS.length - 2 && d >= KEYS[i + 1].at) i++; return (KEYS[i + 1].h - KEYS[i].h) / (KEYS[i + 1].at - KEYS[i].at); };
     const lerp = (a, b, t) => (Array.isArray(a) ? a.map((v, i) => v + (b[i] - v) * t) : a + (b - a) * t);
     let lastLabel = "";
     const day = (d) => {
@@ -484,7 +506,7 @@
       try { const st = JSON.parse(localStorage.getItem("pp-rain-tune-3") || "null"); if (st) Object.assign(rain.P, st); } catch (e) {}
       import("/assets/js/tune.js").then((m) => m.tune(rain, (mode) => {
         const at = typeof mode === "number" ? mode : { dawn: 0, day: 0.2, dusk: 0.62, night: 1 }[mode];
-        if (at !== undefined) { DAY.t = DAY.v = at; }
+        if (at !== undefined) { DAY.t = DAY.v = at; DAY.n = DAY.nv = 0; }
         if (typeof mode !== "number") setStorm(mode === "storm" ? 1 : 0);
       }));
       window.rain = rain;
@@ -504,11 +526,12 @@
     // once everything has loaded and settled, the voice says hello
     const greet = () => gsap.delayedCall(reduce ? 0.3 : 1.5, () => {
       introEnd = performance.now();
+      DAY.run = true;
       if (voice && mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.t("hello"), 6); }
     });
     // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
     if (voice && !/[?&]nobrain\b/.test(location.search)) voice.wake();
-    return { rain, day, voice, greet, wiping: () => wiping };
+    return { rain, day, slope, voice, greet, wiping: () => wiping };
   })();
 
   /* ---------------- the preview that follows the pointer over lists ---------------- */

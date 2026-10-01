@@ -18,7 +18,7 @@ export async function tune(rain, sky) {
     // vent
     wind: "Força general del vent", breeze: "Brisa constant", gustMin: "Ràfegues: temps mínim entre (s)", gustMax: "Ràfegues: temps màxim entre (s)", gust: "Força de les ràfegues",
     plant: "Moviment general de la planta", bend: "Flexió de la tija", swing: "Gronxat de les flors", flutter: "Tremolor de les flors", meadow: "Moviment del prat del fons",
-    rainLean: "Inclinació de la pluja de fora", dayLength: "Durada del dia (scroll)",
+    rainLean: "Inclinació de la pluja de fora", dayLength: "Durada del dia (scroll)", clock: "Minuts per un dia sencer, sol (0 = aturat)",
     // càmera
     zoom: "Zoom (1 = sense ampliar)", parallax: "Profunditat amb el ratolí", ca: "Aberració cromàtica", exposure: "Exposició",
     // postprocessat
@@ -33,7 +33,7 @@ export async function tune(rain, sky) {
   for (const [group, items] of Object.entries(Rain.schema)) {
     const f = gui.addFolder(FOLDERS[group] || group);
     for (const [k, [, min, max, step]] of Object.entries(items)) {
-      (k === "dayLength" ? day : f).add(rain.P, k, min, max, step).name(LABELS[k] || k).onChange(save).onFinishChange(() => { if (rebuild.has(k)) rain.resize(true); });
+      (k === "dayLength" || k === "clock" ? day : f).add(rain.P, k, min, max, step).name(LABELS[k] || k).onChange(save).onFinishChange(() => { if (rebuild.has(k)) rain.resize(true); });
     }
     f.close();
   }

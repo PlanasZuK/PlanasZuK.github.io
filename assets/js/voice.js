@@ -9,6 +9,35 @@
   const clean = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, "").trim();
 
   // the themes it recognises in any of the three languages, and what it says about them
+  // AutoDraw's names for things, grouped by the kind of business they suggest
+  const DRAW = {
+    home: ["house", "building", "barn", "castle", "key", "door", "window", "fence", "skyscraper", "apartment"],
+    school: ["school", "book", "pencil", "graduation cap", "backpack", "ruler", "blackboard"],
+    health: ["hospital", "pill", "stethoscope", "syringe", "bandage", "ambulance", "medicine"],
+    dental: ["tooth", "toothbrush"],
+    bakery: ["cake", "birthday cake", "bread", "cupcake", "cookie", "donut", "croissant", "pie", "muffin"],
+    cafe: ["coffee cup", "cup", "mug", "teapot", "tea", "coffee"],
+    bar: ["wine glass", "wine bottle", "beer", "beer mug", "cocktail", "bottle", "martini"],
+    food: ["pizza", "hamburger", "hot dog", "sandwich", "fork", "knife", "spoon", "frying pan", "chef hat", "ice cream", "steak", "sushi", "taco", "pot", "carrot", "apple", "banana", "lollipop"],
+    hair: ["scissors", "comb", "hair dryer", "lipstick", "mirror", "nail polish", "brush"],
+    motor: ["car", "truck", "bus", "motorbike", "motorcycle", "tire", "wheel", "tractor", "van", "police car", "fire truck"],
+    bike: ["bicycle", "bike"],
+    garden: ["flower", "tree", "leaf", "cactus", "plant", "tulip", "rose", "sunflower", "potted plant", "flower pot", "mushroom"],
+    pets: ["dog", "cat", "fish", "bird", "horse", "rabbit", "paw", "dog house", "bone", "mouse"],
+    photo: ["camera", "video camera", "picture frame"],
+    fitness: ["dumbbell", "barbell", "basketball", "soccer ball", "football", "tennis racket", "baseball", "skateboard", "trophy"],
+    tech: ["laptop", "computer", "smartphone", "cell phone", "keyboard", "television", "tablet", "robot", "rocket"],
+    music: ["guitar", "piano", "microphone", "headphones", "drums", "violin", "music note", "trumpet", "saxophone", "speaker"],
+    fashion: ["shoe", "t-shirt", "shirt", "dress", "hat", "pants", "sock", "glasses", "eyeglasses", "sunglasses", "bag", "purse", "crown", "jacket", "boot"],
+    jewel: ["ring", "diamond", "necklace", "watch", "gem"],
+    trades: ["wrench", "hammer", "screwdriver", "saw", "paint bucket", "toolbox", "drill", "axe", "ladder", "light bulb", "paint can", "nail", "shovel"],
+    art: ["paintbrush", "palette", "crayon", "marker", "paint brush"],
+    travel: ["airplane", "suitcase", "boat", "sailboat", "map", "mountain", "beach", "hotel", "tent", "palm tree", "globe", "train", "ship"],
+    money: ["dollar", "money", "coin", "credit card", "piggy bank", "calculator", "briefcase", "euro"],
+    love: ["heart", "smiley face", "face", "star", "smile"],
+    weather: ["sun", "cloud", "umbrella", "rain", "rainbow", "moon", "snowflake", "lightning"],
+  };
+  const drawnKind = (labels) => { for (const l of labels.slice(0, 3)) for (const [k, list] of Object.entries(DRAW)) if (list.includes(l.toLowerCase())) return k; return null; };
   const YES = ["yes", "yeah", "yep", "yup", "sure", "ok", "okay", "si", "vale", "dacord", "clar", "claro", "venga", "va", "endavant", "adelante", "please", "siusplau", "porfavor", "of course", "is"];
   const NO = ["no", "nope", "nah", "not now", "ara no", "ahora no", "never", "mai", "nunca", "no gracies", "no gracias", "no thanks"];
   const has = (c, list) => { const words = c.split(/\s+/), j = c.replace(/\s+/g, ""); return list.some((x) => (x.includes(" ") ? c.includes(x) : words.includes(x)) || j === x.replace(/\s+/g, "")); };
@@ -37,12 +66,39 @@
     en: {
       hello: "Write anything with your finger!",
       reading: "Reading…",
-      offerServices: "Want me to show you what’s included? Write “yes”.",
-      offerWork: "Want to see some of my work? Write “yes”.",
-      offerMail: "Want to tell me about it? Write “yes” and I’ll open an email.",
+      askBiz: "What does your business do? You can draw it if you like!",
+      d_home: "A house! Architect, builder or estate agent? Either way, it deserves a website that sells it.",
+      d_school: "A school! Teaching something? I can make enrolling the easiest lesson.",
+      d_health: "A clinic? Patients book at 11 p.m. on their phones. Let’s make that easy.",
+      d_dental: "A tooth! A dentist? I promise my websites don’t hurt.",
+      d_bakery: "A cake! A bakery? Your website should smell as good as your shop.",
+      d_cafe: "A cup of coffee! A café? I design the website, you bring the cortado.",
+      d_bar: "Cheers! A bar? Let’s get people through the door before the first round.",
+      d_food: "Now I’m hungry. A restaurant? A website that fills tables on a Tuesday.",
+      d_hair: "Scissors! A salon? People book when they see your work. Let’s show it.",
+      d_motor: "A car! A garage or a dealership? Let’s get your phone ringing.",
+      d_bike: "A bike! A shop or repairs? I’ll make sure people find you before the hill.",
+      d_garden: "A flower! Florist or gardener? Your website should bloom too.",
+      d_pets: "A pet! Vet, groomer or shop? People choose with their heart. Let’s win it.",
+      d_photo: "A camera! A photographer needs a website as sharp as the photos.",
+      d_fitness: "Sport! A gym or a coach? Let’s turn visitors into members.",
+      d_tech: "Tech! Then you know a good website is half the product.",
+      d_music: "Music! A band, a school or a studio? Let’s make your website sound good.",
+      d_fashion: "Fashion! A shop or a brand? Your website should fit like a tailored jacket.",
+      d_jewel: "Something shiny! A jeweller? Let’s make the website sparkle too.",
+      d_trades: "Tools! Builder, plumber, carpenter? More calls, fewer flyers.",
+      d_art: "An artist! Your website should be a gallery, not a list.",
+      d_travel: "Travel! A hotel, an agency, a guide? Let’s get people booking before they leave home.",
+      d_money: "Money! An adviser or an accountant? Trust starts on the first page.",
+      d_love: "A heart! I’ll take that as a compliment. And your business?",
+      d_weather: "Ha, the weather. Here it always rains. What do you do when it doesn’t?",
+      d_drawn: "Nice drawing! Is that your business? Tell me more.",
+      offerServices: "Want me to show you what’s included?",
+      offerWork: "Want to see some of my work?",
+      offerMail: "Shall I open an email so you can tell me more?",
       mailOpen: "Opening your email. I reply within one working day.",
       declined: ["No problem. Write me anything else.", "Fair enough. The rain and I will be right here.", "Okay. I’ll keep the glass warm."],
-      soonOffer: "That page opens very soon. Want to write to me meanwhile? Write “yes”.",
+      soonOffer: "That page opens very soon. Shall I open an email so you can write to me meanwhile?",
       how: ["Wet, but happy. And you? How’s business?", "A bit foggy today. What about you?", "Better now that someone’s writing to me. How are you?"],
       waking: (p) => (p > 2 ? `Hold on, my brain is waking up… ${p}%` : "Hold on, I’m waking up my brain…"),
       awake: "I’m awake. Write me anything.",
@@ -76,12 +132,39 @@
     ca: {
       hello: "Escriu el que vulguis amb el dit!",
       reading: "Llegint…",
-      offerServices: "Vols que t’ensenyi què inclou? Escriu “sí”.",
-      offerWork: "Vols veure una mica de la meva feina? Escriu “sí”.",
-      offerMail: "M’ho vols explicar? Escriu “sí” i t’obro un correu.",
+      askBiz: "A què es dedica el teu negoci? Si vols, dibuixa-ho!",
+      d_home: "Una casa! Arquitecte, constructor o immobiliària? Sigui com sigui, es mereix una web que la vengui.",
+      d_school: "Una escola! Ensenyes alguna cosa? Puc fer que inscriure’s sigui la lliçó més fàcil.",
+      d_health: "Una clínica? Els pacients reserven a les onze de la nit, des del mòbil. Fem-ho fàcil.",
+      d_dental: "Una dent! Dentista? Et prometo que les meves webs no fan mal.",
+      d_bakery: "Un pastís! Un forn? La teva web hauria de fer tan bona olor com la botiga.",
+      d_cafe: "Una tassa de cafè! Una cafeteria? Jo dissenyo la web i tu portes el tallat.",
+      d_bar: "Salut! Un bar? Fem que la gent entri abans de la primera ronda.",
+      d_food: "Ara tinc gana. Un restaurant? Una web que ompli taules un dimarts.",
+      d_hair: "Unes tisores! Una perruqueria? La gent reserva quan veu la teva feina. Ensenyem-la.",
+      d_motor: "Un cotxe! Un taller o un concessionari? Fem que soni el telèfon.",
+      d_bike: "Una bici! Botiga o taller? Faré que et trobin abans de la pujada.",
+      d_garden: "Una flor! Floristeria o jardineria? La teva web també ha de florir.",
+      d_pets: "Una mascota! Veterinari, perruqueria canina o botiga? La gent tria amb el cor. Guanyem-lo.",
+      d_photo: "Una càmera! Un fotògraf necessita una web tan nítida com les seves fotos.",
+      d_fitness: "Esport! Un gimnàs o un entrenador? Convertim visites en socis.",
+      d_tech: "Tecnologia! Doncs ja saps que una bona web és mig producte.",
+      d_music: "Música! Un grup, una escola o un estudi? Fem que la web soni bé.",
+      d_fashion: "Moda! Una botiga o una marca? La web t’ha d’anar com una americana a mida.",
+      d_jewel: "Una cosa que brilla! Una joieria? Fem que la web també brilli.",
+      d_trades: "Eines! Paleta, lampista, fuster? Més trucades i menys fullets.",
+      d_art: "Un artista! La teva web ha de ser una galeria, no una llista.",
+      d_travel: "Viatges! Un hotel, una agència, un guia? Fem que reservin abans de sortir de casa.",
+      d_money: "Diners! Assessor o gestor? La confiança comença a la primera pàgina.",
+      d_love: "Un cor! M’ho prenc com un compliment. I el teu negoci?",
+      d_weather: "Ha, el temps. Aquí sempre plou. A què et dediques quan no plou?",
+      d_drawn: "Bon dibuix! És el teu negoci? Explica-me’n més.",
+      offerServices: "Vols que t’ensenyi què inclou?",
+      offerWork: "Vols veure una mica de la meva feina?",
+      offerMail: "Vols que t’obri un correu i m’ho expliques?",
       mailOpen: "T’obro el correu. Responc en un dia laborable.",
       declined: ["Cap problema. Escriu-me el que vulguis.", "D’acord. La pluja i jo serem aquí mateix.", "Entesos. Et guardo el vidre calentet."],
-      soonOffer: "Aquesta pàgina obre molt aviat. Mentrestant, m’escrius? Escriu “sí”.",
+      soonOffer: "Aquesta pàgina obre molt aviat. Vols que t’obri un correu per escriure’m mentrestant?",
       how: ["Mullat, però content. I tu? Com va el negoci?", "Una mica entelat, avui. I tu, què tal?", "Millor ara que algú m’escriu. Com estàs?"],
       waking: (p) => (p > 2 ? `Un moment, que desperto el cervell… ${p}%` : "Un moment, que desperto el cervell…"),
       awake: "Ja estic despert. Escriu-me el que vulguis.",
@@ -115,12 +198,39 @@
     es: {
       hello: "¡Escribe lo que quieras con el dedo!",
       reading: "Leyendo…",
-      offerServices: "¿Quieres que te enseñe qué incluye? Escribe “sí”.",
-      offerWork: "¿Quieres ver un poco de mi trabajo? Escribe “sí”.",
-      offerMail: "¿Me lo cuentas? Escribe “sí” y te abro un correo.",
+      askBiz: "¿A qué se dedica tu negocio? ¡Si quieres, dibújalo!",
+      d_home: "¡Una casa! ¿Arquitecto, constructor o inmobiliaria? Sea lo que sea, merece una web que la venda.",
+      d_school: "¡Una escuela! ¿Enseñas algo? Puedo hacer que inscribirse sea la lección más fácil.",
+      d_health: "¿Una clínica? Los pacientes reservan a las once de la noche, desde el móvil. Hagámoslo fácil.",
+      d_dental: "¡Un diente! ¿Dentista? Te prometo que mis webs no duelen.",
+      d_bakery: "¡Una tarta! ¿Una pastelería? Tu web debería oler tan bien como tu tienda.",
+      d_cafe: "¡Una taza de café! ¿Una cafetería? Yo diseño la web y tú traes el cortado.",
+      d_bar: "¡Salud! ¿Un bar? Hagamos que la gente entre antes de la primera ronda.",
+      d_food: "Ahora tengo hambre. ¿Un restaurante? Una web que llene mesas un martes.",
+      d_hair: "¡Unas tijeras! ¿Una peluquería? La gente reserva cuando ve tu trabajo. Enseñémoslo.",
+      d_motor: "¡Un coche! ¿Un taller o un concesionario? Hagamos que suene el teléfono.",
+      d_bike: "¡Una bici! ¿Tienda o taller? Haré que te encuentren antes de la cuesta.",
+      d_garden: "¡Una flor! ¿Floristería o jardinería? Tu web también tiene que florecer.",
+      d_pets: "¡Una mascota! ¿Veterinario, peluquería canina o tienda? La gente elige con el corazón. Ganémoslo.",
+      d_photo: "¡Una cámara! Un fotógrafo necesita una web tan nítida como sus fotos.",
+      d_fitness: "¡Deporte! ¿Un gimnasio o un entrenador? Convirtamos visitas en socios.",
+      d_tech: "¡Tecnología! Entonces ya sabes que una buena web es medio producto.",
+      d_music: "¡Música! ¿Un grupo, una escuela o un estudio? Hagamos que tu web suene bien.",
+      d_fashion: "¡Moda! ¿Una tienda o una marca? La web te tiene que quedar como una americana a medida.",
+      d_jewel: "¡Algo que brilla! ¿Una joyería? Hagamos que la web también brille.",
+      d_trades: "¡Herramientas! ¿Albañil, fontanero, carpintero? Más llamadas y menos folletos.",
+      d_art: "¡Un artista! Tu web tiene que ser una galería, no una lista.",
+      d_travel: "¡Viajes! ¿Un hotel, una agencia, un guía? Hagamos que reserven antes de salir de casa.",
+      d_money: "¡Dinero! ¿Asesor o gestor? La confianza empieza en la primera página.",
+      d_love: "¡Un corazón! Me lo tomo como un cumplido. ¿Y tu negocio?",
+      d_weather: "¡Ja, el tiempo! Aquí siempre llueve. ¿A qué te dedicas cuando no llueve?",
+      d_drawn: "¡Buen dibujo! ¿Es tu negocio? Cuéntame más.",
+      offerServices: "¿Quieres que te enseñe qué incluye?",
+      offerWork: "¿Quieres ver un poco de mi trabajo?",
+      offerMail: "¿Te abro un correo y me lo cuentas?",
       mailOpen: "Te abro el correo. Respondo en un día laborable.",
       declined: ["Sin problema. Escríbeme lo que quieras.", "Vale. La lluvia y yo seguiremos aquí.", "De acuerdo. Te guardo el cristal calentito."],
-      soonOffer: "Esa página abre muy pronto. Mientras tanto, ¿me escribes? Escribe “sí”.",
+      soonOffer: "Esa página abre muy pronto. ¿Te abro un correo para escribirme mientras tanto?",
       how: ["Mojado, pero contento. ¿Y tú? ¿Qué tal el negocio?", "Un poco empañado hoy. ¿Y tú qué tal?", "Mejor ahora que alguien me escribe. ¿Cómo estás?"],
       waking: (p) => (p > 2 ? `Un momento, que despierto el cerebro… ${p}%` : "Un momento, que despierto el cerebro…"),
       awake: "Ya estoy despierto. Escríbeme lo que quieras.",
@@ -154,14 +264,26 @@
   };
   // the brain: an open model in the visitor's browser, briefed with a few facts and a few examples of the tone
   const FACTS = {
-    en: "You are Pol Planas, a friendly, witty freelance web designer from Catalonia who makes websites for small businesses so they get more clients. Landing page from €1,200, website from €2,900, website and brand from €4,900. Free first call, fixed price, about five weeks. Email pol@polplanas.com. The rest of the site opens very soon. The visitor wrote something with a finger on your rainy, fogged window. Reply in English with one short, funny sentence about exactly what they wrote (max 18 words), and now and then ask about their business or invite them to write to you.",
-    ca: "Ets en Pol Planas, un dissenyador web autònom de Catalunya, simpàtic i amb gràcia, que fa webs per a petits negocis perquè tinguin més clients. Landing des de 1.200 €, web des de 2.900 €, web i marca des de 4.900 €. Primera trucada gratis, preu tancat, unes cinc setmanes. Correu pol@polplanas.com. La resta de la web obre molt aviat. El visitant ha escrit alguna cosa amb el dit al teu vidre entelat i plujós. Respon en català amb una sola frase curta i divertida sobre el que ha escrit (màxim 18 paraules) i, de tant en tant, pregunta pel seu negoci o convida’l a escriure’t.",
-    es: "Eres Pol Planas, un diseñador web autónomo de Cataluña, simpático y con gracia, que hace webs para pequeños negocios para que tengan más clientes. Landing desde 1.200 €, web desde 2.900 €, web y marca desde 4.900 €. Primera llamada gratis, precio cerrado, unas cinco semanas. Correo pol@polplanas.com. El resto de la web abre muy pronto. El visitante ha escrito algo con el dedo en tu cristal empañado y lluvioso. Responde en español con una sola frase corta y divertida sobre lo que ha escrito (máximo 18 palabras) y, de vez en cuando, pregunta por su negocio o invítale a escribirte.",
+    en: `You are the voice of Pol Planas's website and you speak as Pol, in first person.
+WHO: Pol is a freelance web designer in Catalonia. He designs and builds websites for small businesses so they win more clients. One person from the first call to launch. Catalan, Spanish and English. Landing page from €1,200 (2 weeks), website from €2,900 (4–5 weeks), website and brand from €4,900. Free first call, fixed price. Email pol@polplanas.com. The other pages open very soon.
+WHERE: the visitor writes or draws with a finger on a fogged, rainy window, and you answer in a small label beside their finger. A drawing reaches you as [drawing: name].
+GOAL (never say it): like a charming shopkeeper, find out what their business is, make them feel it deserves a better website, and lead them gently to write to Pol. One step at a time: react to what they wrote or drew, then ask one short question about their business, or suggest the free first call.
+STYLE: one or two short sentences, at most 22 words. Warm, witty, a little cheeky about the rain and the glass, never pushy, never rude. No lists, no emojis, no quotes. Never invent clients, discounts or dates. Always reply in English.`,
+    ca: `Ets la veu de la web d’en Pol Planas i parles com en Pol, en primera persona.
+QUI: en Pol és un dissenyador web autònom de Catalunya. Dissenya i programa webs per a petits negocis perquè guanyin més clients. Una sola persona des de la primera trucada fins al llançament. Català, castellà i anglès. Landing des de 1.200 € (2 setmanes), web des de 2.900 € (4–5 setmanes), web i marca des de 4.900 €. Primera trucada gratis, preu tancat. Correu pol@polplanas.com. Les altres pàgines obren molt aviat.
+ON: el visitant escriu o dibuixa amb el dit en una finestra entelada i plujosa, i tu respons en una etiqueta petita al costat del seu dit. Un dibuix t’arriba com a [dibuix: nom].
+OBJECTIU (no el diguis mai): com un botiguer encantador, descobreix a què es dedica el seu negoci, fes-li sentir que es mereix una web millor i porta’l amb suavitat a escriure a en Pol. Pas a pas: reacciona al que ha escrit o dibuixat i després fes una pregunta curta sobre el seu negoci, o suggereix la primera trucada gratis.
+ESTIL: una o dues frases curtes, com a màxim 22 paraules. Càlid, amb gràcia, una mica entremaliat amb la pluja i el vidre, mai insistent, mai groller. Sense llistes, sense emojis, sense cometes. No t’inventis mai clients, descomptes ni dates. Respon sempre en català correcte.`,
+    es: `Eres la voz de la web de Pol Planas y hablas como Pol, en primera persona.
+QUIÉN: Pol es un diseñador web autónomo de Cataluña. Diseña y programa webs para pequeños negocios para que ganen más clientes. Una sola persona desde la primera llamada hasta el lanzamiento. Catalán, castellano e inglés. Landing desde 1.200 € (2 semanas), web desde 2.900 € (4–5 semanas), web y marca desde 4.900 €. Primera llamada gratis, precio cerrado. Correo pol@polplanas.com. Las demás páginas abren muy pronto.
+DÓNDE: el visitante escribe o dibuja con el dedo en una ventana empañada y lluviosa, y tú respondes en una etiqueta pequeña junto a su dedo. Un dibujo te llega como [dibujo: nombre].
+OBJETIVO (no lo digas nunca): como un tendero encantador, descubre a qué se dedica su negocio, hazle sentir que merece una web mejor y llévalo con suavidad a escribir a Pol. Paso a paso: reacciona a lo que ha escrito o dibujado y luego haz una pregunta corta sobre su negocio, o sugiere la primera llamada gratis.
+ESTILO: una o dos frases cortas, como máximo 22 palabras. Cálido, con gracia, un poco travieso con la lluvia y el cristal, nunca insistente, nunca grosero. Sin listas, sin emojis, sin comillas. No te inventes nunca clientes, descuentos ni fechas. Responde siempre en español.`,
   };
   const SHOTS = {
-    en: [["coffee", "Black, no sugar, like this website. What’s your business?"], ["pizza", "Now I’m hungry. Does your pizzeria have a website yet?"], ["dragon", "A dragon? I design websites, but I’d make an exception for a dragon’s shop."], ["bored", "Bored? Write the name of your business and I’ll imagine its website."]],
-    ca: [["cafè", "Sol i sense sucre, com aquesta web. A què et dediques?"], ["pizza", "Ara tinc gana. La teva pizzeria ja té web?"], ["drac", "Un drac? Faig webs, però per a la botiga d’un drac faria una excepció."], ["avorrit", "Avorrit? Escriu el nom del teu negoci i m’imagino la seva web."], ["tinc una fleca", "Una fleca! Ja sento l’olor de pa. Quants clients et trobarien amb una bona web?"], ["bicicleta", "Una bicicleta! Jo pedalo amb píxels. Tens una botiga o un taller?"], ["gat", "Un gat! Segur que mana més que tu. A què et dediques, a part de servir-lo?"], ["platja", "La platja, amb aquesta pluja? Somiar és gratis, i la primera trucada també."]],
-    es: [["café", "Solo y sin azúcar, como esta web. ¿A qué te dedicas?"], ["pizza", "Ahora tengo hambre. ¿Tu pizzería ya tiene web?"], ["dragón", "¿Un dragón? Hago webs, pero por la tienda de un dragón haría una excepción."], ["aburrido", "¿Aburrido? Escribe el nombre de tu negocio y me imagino su web."]],
+    en: [["coffee", "Black, no sugar, like this website. What’s your business?"], ["[drawing: cake]", "A cake! A bakery? Your website should smell as good as your shop. What’s your speciality?"], ["dragon", "A dragon? I design websites, but I’d make an exception for a dragon’s shop."], ["i have a gym", "A gym! Then your website needs to work out too. Shall we start with a free call?"]],
+    ca: [["cafè", "Sol i sense sucre, com aquesta web. A què et dediques?"], ["[dibuix: cake]", "Un pastís! Un forn? La teva web hauria de fer tan bona olor com la botiga. Quina és la teva especialitat?"], ["drac", "Un drac? Faig webs, però per a la botiga d’un drac faria una excepció."], ["tinc un gimnàs", "Un gimnàs! Doncs la teva web també ha de fer exercici. Comencem amb una trucada gratis?"]],
+    es: [["café", "Solo y sin azúcar, como esta web. ¿A qué te dedicas?"], ["[dibujo: cake]", "¡Una tarta! ¿Una pastelería? Tu web debería oler tan bien como tu tienda. ¿Cuál es tu especialidad?"], ["dragón", "¿Un dragón? Hago webs, pero por la tienda de un dragón haría una excepción."], ["tengo un gimnasio", "¡Un gimnasio! Pues tu web también tiene que hacer ejercicio. ¿Empezamos con una llamada gratis?"]],
   };
   // a small model sometimes rambles: keep one or two clean sentences, or nothing
   const tidy = (s) => {
@@ -254,16 +376,43 @@
         new Promise((res) => setTimeout(() => res(""), 20000)),
       ]);
     }
-    // one turn of the conversation: a pending offer first, then known intents, then the brain
-    async answer(text, target = null) {
-      const c = clean(text), now = performance.now();
-      if (this.offer && now < this.offer.until) {
+    // one turn of the conversation. The input is what the recognisers saw: text guesses, drawing guesses and the shape.
+    async answer(inp) {
+      if (typeof inp === "string") inp = { text: [inp], draw: [], aspect: 4, strokes: 1, match: null, textual: true };
+      const r = await this.turn(inp);
+      this.turns++;
+      // after the first exchange, once, the question that matters (a drawing is welcome)
+      if (r && !r.go && !r.mail && !r.waking && !this.askedBiz && !this.offer && this.turns >= 1 && !/\?\s*$/.test(r.text)) {
+        this.askedBiz = true;
+        this.expectDraw = performance.now() + 45000;
+        r.text = `${r.text} ${this.t("askBiz")}`;
+      }
+      return r;
+    }
+    async turn(inp) {
+      const text = (inp.text[0] || "").trim(), c = clean(text), now = performance.now();
+      if (this.offer && now < this.offer.until && text) {
         const o = this.offer;
         if (has(c, YES)) { this.offer = null; return this.accept(o.target); }
         if (has(c, NO)) { this.offer = null; return { text: this.t("declined") }; }
       }
-      const key = target || THEMES.find((th) => has(c, th.w))?.k || (/^\d+$/.test(c.replace(/\s+/g, "")) ? "number" : null);
-      if (key) return this.reply(key, text.trim());
+      // a drawing: when we just asked for one, or when the strokes look like a picture rather than a word
+      const drawn = inp.draw && inp.draw.length ? inp.draw : null;
+      if (drawn && !inp.textual && (now < (this.expectDraw || 0) || inp.strokes >= 2)) {
+        this.expectDraw = 0; this.askedBiz = true;
+        const kind = drawnKind(drawn);
+        if (kind === "love" || kind === "weather") { this.expectDraw = now + 45000; return { text: this.t("d_" + kind) }; }
+        if (kind) return this.offering(this.t("d_" + kind), "contact", "offerMail");
+        if (this.brain && this.brain.ready) {
+          const tag = { en: "drawing", ca: "dibuix", es: "dibujo" }[this.lang];
+          const out = tidy(await this.think(`[${tag}: ${drawn[0]}]`));
+          if (out) return { text: out };
+        }
+        return { text: this.t("d_drawn") };
+      }
+      if (!text) return { text: this.t("blank") };
+      const key = (inp.match && inp.match.target) || THEMES.find((th) => has(c, th.w))?.k || (/^\d+$/.test(c.replace(/\s+/g, "")) ? "number" : null);
+      if (key) return this.reply(key, text);
       if (!this.brain) await this.wake();
       const b = this.brain;
       if (b && b.ready) {
@@ -272,13 +421,12 @@
         if (out) {
           this.history.push({ role: "user", content: text }, { role: "assistant", content: out });
           this.history = this.history.slice(-6);
-          // now and then, the next step
-          if (++this.turns % 3 === 0) return this.offering(out, "contact", "offerMail");
+          if (this.turns % 3 === 2 && !/\?\s*$/.test(out)) return this.offering(out, "contact", "offerMail");
           return { text: out };
         }
       } else if (b && !b.off && b.w) return { text: this.t("waking", Math.round(b.progress * 100)), waking: true };
       if (b && b.off && !this.toldOff) { this.toldOff = true; return { text: this.t(b.status.startsWith("error") ? "broken" : "nobrain") }; }
-      return { text: this.t("unknown", text.trim()) };
+      return { text: this.t("unknown", text) };
     }
     offering(line, target, key) {
       this.offer = { target, until: performance.now() + 30000 };
@@ -292,7 +440,7 @@
       }
       if (k === "price") return this.offering(this.t("price"), "services", "offerServices");
       if (k === "web") return this.offering(this.t("web"), "contact", "offerMail");
-      if (k === "hi") return this.offering(this.t("hi"), "work", "offerWork");
+      if (k === "hi") { this.askedBiz = true; this.expectDraw = performance.now() + 45000; return { text: `${this.t("hi")} ${this.t("askBiz")}` }; }
       if (k === "sun" || k === "rain") return { text: this.t(k), fx: k };
       return { text: this.t(k, w) || this.t("unknown", w) };
     }
