@@ -171,6 +171,7 @@
     mode = "focus";
     window.scrollTo(0, 0);
     view(current).scrollTop = y;
+    if (page.dataset.page === "work") requestAnimationFrame(() => dark.still());
   }
   // while the camera moves, a page you left at its bottom rolls back to its top
   function settle(id) {
@@ -299,7 +300,6 @@
   }
   const norm = (e) => (e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY);
   addEventListener("wheel", (e) => {
-    if (mode === "page" && current === "work" && !caseOpen && !busy && rail.wheel(norm(e) + e.deltaX)) return;
     pull(norm(e));
   }, { passive: true });
   let ty = null;
@@ -315,7 +315,7 @@
   addEventListener("keydown", (e) => {
     if (e.target.closest && e.target.closest("input, select, textarea")) return;
     if (e.key === "Escape") { if (caseOpen) closeCase(); else if (mode === "page") go("overview"); else if (mode === "overview") go(current); return; }
-    if (mode === "page" && current === "work" && !caseOpen && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { rail.key(e.key === "ArrowRight" ? 1 : -1); return; }
+    if (mode === "page" && current === "work" && !caseOpen && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { e.preventDefault(); dark.key(e.key === "ArrowRight" ? 1 : -1); return; }
     if (mode === "focus" && ["ArrowDown", "PageDown", " "].includes(e.key)) { e.preventDefault(); go("overview"); }
     else if (mode === "overview" && !busy && ["ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); go(current); }
   });
@@ -682,75 +682,120 @@
     } });
   };
 
-  /* ---------------- work: a rail of projects you move with the wheel, a drag or a swipe ---------------- */
-  const rail = (() => {
-    const el = $(".wk__rail");
-    if (!el) return { wheel: () => false, layout() {}, key() {} };
-    const items = $$(".wk__item", el), pics = items.map((i) => $(".wk__img img", i));
-    const count = $(".wk__count b"), bar = $(".wk__bar");
-    let target = 0, driving = false, drag = null, dragged = false;
-    const max = () => Math.max(0, el.scrollWidth - el.clientWidth);
-    function layout() {
-      const cap = ($(".wk__cap", el) || { offsetHeight: 24 }).offsetHeight + 10;
-      const pad = parseFloat(getComputedStyle(el).paddingTop) || 0;
-      el.style.setProperty("--ih", Math.max(140, el.clientHeight - pad - cap) + "px");
-      target = el.scrollLeft;
-      update();
+  /* ---------------- work: the darkroom. The scroll pulls the cord; the print under the lamp is the one you read ---------------- */
+  const dark = (() => {
+    const sec = $(".dark");
+    const none = { enter() {}, key() {}, still() {}, rect() { return null; }, tick() {} };
+    if (!sec) return none;
+    const c = $(".dark__gl", sec), items = JSON.parse($(".dark__data", sec).textContent), N = items.length;
+    const dr = window.Darkroom && Darkroom.supported ? new Darkroom(c, items, { reduce }) : null;
+    if (!dr || !dr.ok) { sec.classList.add("no-gl"); return none; }
+    const word = $(".dark__word", sec), nEl = $(".dark__n", sec), kEl = $(".dark__k", sec), open = $(".dark__open", sec), openRoll = $(".btn__roll", open);
+    const contactOpen = !isLocked("contact"), pad = (n) => String(n).padStart(2, "0");
+    let idx = 0, fresh = true, snapT = 0, drag = null, dragged = false, lastP = 0;
+    const live = () => mode === "page" && current === "work" && !caseOpen && !busy;
+    // scroll ↔ print: the section starts at the top of the page, and each print takes the same stretch of it
+    const range = () => Math.max(1, sec.offsetHeight - innerHeight);
+    const top = () => sec.getBoundingClientRect().top + window.scrollY;
+    const yFor = (i) => top() + (Math.max(0, Math.min(N - 1, i)) / (N - 1)) * range();
+    const progress = () => clamp((window.scrollY - top()) / range()) * (N - 1);
+    const to = (y, immediate) => { if (lenis) lenis.scrollTo(y, immediate ? { immediate: true, force: true } : { duration: 1.1, easing: (t) => 1 - Math.pow(1 - t, 4), force: true }); else window.scrollTo({ top: y, behavior: immediate || reduce ? "auto" : "smooth" }); };
+    const goTo = (i) => to(yFor(i));
+    // the caption under the cord: the name leaves the way the cord moves and the next one comes in behind it
+    function show(i, dir) {
+      if (i === idx) return;
+      const it = items[i];
+      idx = i;
+      nEl.textContent = pad(i + 1); kEl.textContent = it.kind;
+      open.href = it.href; open.classList.toggle("is-blank", !it.slug);
+      if (it.slug) { open.dataset.case = it.slug; delete open.dataset.go; } else { delete open.dataset.case; if (contactOpen) open.dataset.go = "contact"; }
+      const label = it.cta || sec.dataset.labelOpen;
+      openRoll.textContent = label; openRoll.dataset.text = label;
+      if (reduce) { word.textContent = it.name; return; }
+      // passing several prints quickly: the name only ever comes in, never gets stuck on its way out
+      const busyWord = gsap.isTweening(word);
+      gsap.killTweensOf(word);
+      const enter = () => { word.textContent = it.name; gsap.fromTo(word, { yPercent: dir > 0 ? 110 : -110 }, { yPercent: 0, duration: 1, ease: EO }); };
+      if (busyWord) enter();
+      else gsap.to(word, { yPercent: dir > 0 ? -110 : 110, duration: 0.3, ease: "power2.in", onComplete: enter });
     }
     function update() {
-      const m = max(), p = m ? el.scrollLeft / m : 0, frac = el.scrollWidth ? el.clientWidth / el.scrollWidth : 1;
-      bar.style.setProperty("--tw", (frac * 100).toFixed(2) + "%");
-      bar.style.setProperty("--tx", ((p * (1 - frac)) / frac * 100).toFixed(2) + "%");
-      const n = Math.round(p * (items.length - 1)) + 1;
-      if (count.textContent !== String(n).padStart(2, "0")) count.textContent = String(n).padStart(2, "0");
-      // each picture drifts a little inside its frame, so the rail has depth
-      if (reduce) return;
-      const r = el.getBoundingClientRect(), mid = r.left + r.width / 2;
-      items.forEach((it, i) => {
-        const b = it.getBoundingClientRect(), off = (b.left + b.width / 2 - mid) / r.width;
-        pics[i].style.transform = `translateX(${(off * -9).toFixed(2)}%)`;
-      });
+      const p = progress();
+      dr.setProgress(p);
+      const i = Math.round(p);
+      if (i !== idx) show(i, p > lastP ? 1 : -1);
+      lastP = p;
     }
-    el.addEventListener("scroll", () => { if (!driving) target = el.scrollLeft; update(); }, { passive: true });
-    // the title above fits itself to the width, so the rail's height is only known after it
-    new ResizeObserver(() => layout()).observe(el);
-    gsap.ticker.add(() => {
-      if (!driving) return;
-      const d = target - el.scrollLeft;
-      if (Math.abs(d) < 0.5) { el.scrollLeft = target; driving = false; return; }
-      el.scrollLeft += d * (reduce ? 1 : 0.1);
-    });
-    const go = (t) => { target = gsap.utils.clamp(0, max(), t); driving = true; };
-    // the wheel moves the rail; at its start, scrolling up hands over to the camera
-    const wheel = (dy) => {
-      if (dy < 0 && target <= 0.5 && el.scrollLeft <= 1) return false;
-      go(target + dy);
-      return true;
-    };
-    const key = (dir) => go(target + dir * (items[0].offsetWidth + 14));
-    el.addEventListener("pointerdown", (e) => {
-      if (e.pointerType !== "mouse" || e.button) return;
-      drag = { x: e.clientX, t: target }; dragged = false;
+    // when the cord stops, it settles with the nearest print under the lamp
+    const snap = () => { if (!live() || drag) return; const p = progress(), i = Math.round(p); if (Math.abs(p - i) > 0.003) goTo(i); };
+    addEventListener("scroll", () => { if (!live()) return; update(); clearTimeout(snapT); snapT = setTimeout(snap, 170); }, { passive: true });
+    // a mouse can also take the cord and pull it sideways; a finger can swipe it
+    const perPrint = () => Math.max(260, innerWidth * 0.42);
+    const pull = (dx) => to(drag.y - (dx / perPrint()) * (range() / (N - 1)), true);
+    c.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "mouse" || e.button || !live()) return;
+      drag = { x: e.clientX, y: window.scrollY, t: performance.now(), lx: e.clientX, v: 0 }; dragged = false;
     });
     addEventListener("pointermove", (e) => {
+      if (!live()) return;
+      const r = c.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+      dr.pointer((x / r.width) * 2 - 1, 1 - (y / r.height) * 2);
+      if (drag) {
+        const dx = e.clientX - drag.x, now = performance.now();
+        drag.v = (e.clientX - drag.lx) / Math.max(1, now - drag.t); drag.lx = e.clientX; drag.t = now;
+        if (!dragged && Math.abs(dx) > 6) { dragged = true; sec.classList.add("is-drag"); cursor.hide(); dr.hover = -1; }
+        if (dragged) pull(dx);
+        return;
+      }
+      if (e.pointerType !== "mouse" || !e.target.closest || e.target !== c) { if (dr.hover !== -1) { dr.hover = -1; sec.classList.remove("is-over"); cursor.hide(); } return; }
+      const h = dr.hit(x, y);
+      if (h !== dr.hover) {
+        dr.hover = h;
+        sec.classList.toggle("is-over", h >= 0);
+        if (h >= 0 && h === idx) cursor.show(items[h].slug ? sec.dataset.open : items[h].cta);
+        else cursor.hide();
+      }
+    }, { passive: true });
+    addEventListener("pointerup", () => {
       if (!drag) return;
-      const dx = e.clientX - drag.x;
-      if (Math.abs(dx) > 5) { dragged = true; el.classList.add("is-drag"); cursor.hide(); }
-      if (dragged) go(drag.t - dx * 1.4);
+      const v = drag.v; drag = null; sec.classList.remove("is-drag");
+      // a flick carries on to the next print
+      if (dragged) goTo(Math.round(progress() - Math.max(-1.5, Math.min(1.5, v * 0.9))));
     });
-    addEventListener("pointerup", () => { drag = null; el.classList.remove("is-drag"); });
-    el.addEventListener("click", (e) => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
-    items.forEach((it) => {
-      const link = $(".wk__link", it);
-      link.addEventListener("pointerenter", () => { if (!touch && mode === "page" && !drag) cursor.show(link.closest(".page").dataset.open || ""); });
-      link.addEventListener("pointerleave", () => cursor.hide());
+    c.addEventListener("click", (e) => {
+      if (dragged) { dragged = false; return; }
+      const r = c.getBoundingClientRect(), h = dr.hit(e.clientX - r.left, e.clientY - r.top);
+      if (h < 0) return;
+      if (h !== idx) { goTo(h); return; }
+      open.click();
     });
-    return { wheel, layout, key };
+    let tx = null;
+    c.addEventListener("touchstart", (e) => { const t = e.touches[0]; tx = { x: t.clientX, y: t.clientY, sy: window.scrollY, h: null }; }, { passive: true });
+    c.addEventListener("touchmove", (e) => {
+      if (!tx || !live()) return;
+      const t = e.touches[0], dx = t.clientX - tx.x, dy = t.clientY - tx.y;
+      if (tx.h === null && Math.hypot(dx, dy) > 8) tx.h = Math.abs(dx) > Math.abs(dy);
+      if (tx.h) window.scrollTo(0, tx.sy - (dx / Math.max(200, innerWidth * 0.7)) * (range() / (N - 1)));
+    }, { passive: true });
+    c.addEventListener("touchend", () => { tx = null; }, { passive: true });
+    // the list behind it, for the keyboard and for screen readers: focusing a print brings it to the lamp
+    $$(".dark__list a", sec).forEach((a) => a.addEventListener("focus", () => { if (live()) goTo(+a.dataset.i); }));
+    return {
+      enter() {
+        // the first time in, everything is still blank paper and the first print develops in front of you
+        if (fresh) { fresh = false; dr.P.forEach((p) => { p.dev = 0; p.seen = 0; }); dr.fade = 0; }
+        dr.size(); idx = -1; lastP = progress(); update(); idx = Math.round(progress()); show(idx, 1);
+      },
+      key(dir) { goTo(idx + dir); },
+      still() { dr.active = false; dr.still(true); },
+      rect(slug) { const i = items.findIndex((x) => x.slug === slug); return i >= 0 && Math.abs(i - progress()) < 0.5 ? dr.rectOf(i) : null; },
+      tick(now) { const a = live(); if (a !== dr.active) { dr.active = a; if (!a) { dr.hover = -1; cursor.hide(); } } if (a) dr.tick(now); },
+    };
   })();
 
   const PAGE = {
     work: {
-      init() { rail.layout(); },
+      init() { dark.enter(); },
     },
     about: {
       init(page) {
@@ -820,7 +865,9 @@
     if (lenis) lenis.stop();
     fitAll(art);
     if (!reduce) gsap.fromTo($(".case__poster", art), { scale: 1.12 }, { scale: 1, duration: 2.2, ease: EO, delay: 0.2 });
-    gsap.fromTo(art, { clipPath: "inset(100% 0% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: reduce ? 0 : 1.1, ease: "power4.inOut" });
+    const from = dark.rect(slug);
+    const clip = from ? `inset(${from.top.toFixed(1)}px ${(innerWidth - from.right).toFixed(1)}px ${(innerHeight - from.bottom).toFixed(1)}px ${from.left.toFixed(1)}px)` : "inset(100% 0% 0% 0%)";
+    gsap.fromTo(art, { clipPath: clip }, { clipPath: "inset(0px 0px 0px 0px)", duration: reduce ? 0 : from ? 1.25 : 1.1, ease: "power4.inOut" });
     if (!reduce) gsap.fromTo($(".case__title", art), { yPercent: 40 }, { yPercent: 0, duration: 1.6, ease: EO, delay: 0.35 });
     $$(".tile", art).forEach((t) => tileIO.observe(t));
     if (TITLES.cases && TITLES.cases[slug]) d.title = TITLES.cases[slug];
@@ -1008,6 +1055,7 @@
     const now = performance.now();
     if (hero.rain) { hero.rain.active = mode !== "page"; hero.rain.tick(now); }
     if (FXOK) FX.tick(now);
+    dark.tick(now);
     // the sound follows the scene: rain, wind, hour, storm, the camera pulling back, the fingertip
     if (window.Sound && Sound.on && hero.rain) {
       const r = hero.rain, s = r.state;
@@ -1040,7 +1088,6 @@
       layout();
       render();
       fitAll();
-      rail.layout();
       if (mode === "page") ScrollTrigger.refresh();
     }, 120);
   });
