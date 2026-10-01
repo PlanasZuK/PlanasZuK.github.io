@@ -48,7 +48,7 @@ void main() {
   const draw = (now) => {
     requestAnimationFrame(draw);
     // only while the overview is in view, at thirty frames a second
-    const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zk")) || 0;
+    const k = window.__zk || 0; // set by the camera, without asking the browser to recompute styles
     if (k < 0.001 || document.hidden || now - last < 33) return;
     last = now;
     gl.uniform1f(uT, reduce ? 40 : (now - t0) / 1000);

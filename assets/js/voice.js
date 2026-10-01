@@ -658,9 +658,14 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
     async eligible() {
       try {
         if (!navigator.gpu || matchMedia("(pointer: coarse)").matches) return false;
+        // Safari's WebGPU runs it, but at the cost of the whole machine (memory pressure, the rain freezing):
+        // there, the written lines answer
+        const ua = navigator.userAgent;
+        if (/safari/i.test(ua) && !/chrome|chromium|crios|edg|opr|firefox|fxios/i.test(ua)) return false;
         const c = navigator.connection;
-        if (c && (c.saveData || /2g/.test(c.effectiveType || ""))) return false;
-        if (navigator.deviceMemory && navigator.deviceMemory < 4) return false;
+        if (c && (c.saveData || /2g|3g/.test(c.effectiveType || ""))) return false;
+        if (navigator.deviceMemory && navigator.deviceMemory < 8) return false;
+        if ((navigator.hardwareConcurrency || 8) < 8) return false;
         return !!(await navigator.gpu.requestAdapter());
       } catch (e) { return false; }
     }
@@ -854,7 +859,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       if (b && b.ready) {
         const out = await this.ask(text);
         if (out) return this.maybeOffer(out);
-      } else if (b && !b.off && b.w) return { text: this.t("waking", Math.round(b.progress * 100)), waking: true };
+      }
       if (b && b.off && !this.toldOff) { this.toldOff = true; return { text: this.t(b.status.startsWith("error") ? "broken" : "nobrain") }; }
       const spare = theme(SPARE, c);
       if (spare) return this.reply(spare, text);

@@ -107,7 +107,7 @@
         s.start(when, off, len); s.stop(when + len + 0.1);
         B.next = when + len - X;
         clearTimeout(B.timer);
-        B.timer = setTimeout(() => play(B.next), Math.max(0, (B.next - ctx.currentTime - 2) * 1000));
+        B.timer = setTimeout(() => play(B.next), Math.max(0, (B.next - ctx.currentTime - 12) * 1000));
       };
       B.play = play;
       this.beds[name] = B;
@@ -434,15 +434,23 @@
       this.voices = this.voices.filter((v) => v.end > now);
       if (this.voices.length >= 10) { const v = this.voices.shift(); try { v.s.stop(); } catch (e) {} }
       const [off, dur] = this.sprites.drops[(Math.random() * this.sprites.drops.length) | 0];
-      const s = ctx.createBufferSource(), gn = ctx.createGain(), p = ctx.createPanner();
+      if (!this.pool) {
+        this.pool = Array.from({ length: 6 }, () => {
+          const q = ctx.createPanner();
+          q.panningModel = "HRTF"; q.distanceModel = "inverse"; q.refDistance = 1; q.rolloffFactor = 0.6;
+          q.connect(this.drops); q.connect(this.room);
+          return q;
+        });
+        this.poolI = 0;
+      }
+      const s = ctx.createBufferSource(), gn = ctx.createGain(), p = this.pool[this.poolI++ % this.pool.length];
       s.buffer = this.buf.drops;
       // bigger drops are lower and fuller; every one a little different
       s.playbackRate.value = Math.pow(2, (Math.random() * 5 - 2.5 - size * 3 + 2) / 12);
       gn.gain.value = (0.25 + 0.75 * clamp(size)) * Math.pow(10, (Math.random() * 6 - 4) / 20);
-      p.panningModel = "HRTF"; p.distanceModel = "inverse"; p.refDistance = 1; p.rolloffFactor = 0.6;
       const px = clamp(x, -1, 1) * 1.3, py = Math.random() * 0.8 - 0.3, pz = -0.8;
-      if (p.positionX) { p.positionX.value = px; p.positionY.value = py; p.positionZ.value = pz; } else p.setPosition(px, py, pz);
-      s.connect(gn).connect(p); p.connect(this.drops); p.connect(this.room);
+      if (p.positionX) { p.positionX.setValueAtTime(px, now); p.positionY.setValueAtTime(py, now); p.positionZ.setValueAtTime(pz, now); } else p.setPosition(px, py, pz);
+      s.connect(gn).connect(p);
       s.start(now, off, dur);
       this.voices.push({ s, end: now + dur / s.playbackRate.value });
     },

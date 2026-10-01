@@ -85,6 +85,7 @@
     world.style.transform = `translate3d(${cam.x.toFixed(2)}px,${cam.y.toFixed(2)}px,0) scale(${cam.s.toFixed(5)})`;
     world.style.setProperty("--k", e.toFixed(3));
     html.style.setProperty("--zk", e.toFixed(3));
+    window.__zk = e;
     world.style.setProperty("--kg", sstep(0.3, 0.75, e).toFixed(3));
     const [cc, cr] = GRID[Z.center];
     // the other pages dock into place as the camera pulls back
@@ -486,6 +487,7 @@
         if (window.__pp) (window.__inks = window.__inks || []).push(input);
         if (!voice || !voice.deliberate(input)) return ignored();
         played = 0;
+        if (!noBrain && !voice.brain) (window.requestIdleCallback || setTimeout)(() => voice.wake(), { timeout: 4000 });
         voice.typing(20);
         handle(input);
       },
@@ -598,7 +600,7 @@
       if (voice && mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.opener(), 7.5); }
     });
     // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
-    if (voice && !/[?&]nobrain\b/.test(location.search)) voice.wake();
+    const noBrain = /[?&]nobrain\b/.test(location.search);
     return { rain, day, slope, voice, greet, hour: () => hourNow, wiping: () => wiping };
   })();
 

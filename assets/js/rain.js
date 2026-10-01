@@ -647,6 +647,8 @@ void main() { o = texture(uSp, vT) * vA; }`;
     }
     tick(now = performance.now()) {
       if (this.dead || !this.ready || !this.visible || !this.active) { this.last = now; return; }
+      // on 120 Hz screens (ProMotion), every other frame: the rain looks the same at 60 and costs half
+      if (now - this.last < 12) return;
       const raw = now - this.last, dt = Math.min(0.05, raw / 1000);
       this.last = now;
       this.adapt(raw, now);
@@ -657,7 +659,8 @@ void main() { o = texture(uSp, vT) * vA; }`;
       this.draw();
       const gl = this.gl, s = this.state, p = this.par, t = (now - this.t0) / 1000, P = this.P;
       p.x += (p.tx - p.x) * 0.03; p.y += (p.ty - p.y) * 0.03;
-      this.upload("fog", this.fog, false);
+      // the fog changes slowly, except under the finger: sent every frame while wiping, otherwise at 30 a second
+      if (this.finger || (this.fogN = (this.fogN || 0) + 1) % 2 === 0) this.upload("fog", this.fog, false);
       if (this.greaseDirty) { this.upload("grease", this.grease, false); this.greaseDirty = false; }
       gl.bindVertexArray(this.vao);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
