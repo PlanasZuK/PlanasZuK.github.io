@@ -142,8 +142,9 @@ STYLE
 - Only if they clearly want to see a page that is open, end with exactly one tag: [go:work], [go:about], [go:services] or [go:contact].`;
 
   class Voice {
-    constructor(el, { lang = "en", locked = [] } = {}) {
+    constructor(el, { lang = "en", locked = [], endpoint = "" } = {}) {
       this.el = el; this.lang = LINES[lang] ? lang : "en"; this.L = LINES[this.lang]; this.locked = locked;
+      this.endpoint = endpoint; this.history = [];
       this.tw = null; this.ai = null; this.last = "";
       this.prepare();
     }
@@ -181,6 +182,22 @@ STYLE
     }
     // whatever they wrote: the on-device model if there is one, the repertoire otherwise
     async answer(text) {
+      // first choice, for everyone: the site's own little server, which asks Gemini
+      if (this.endpoint) {
+        try {
+          const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 7000);
+          const r = await fetch(this.endpoint, { method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: this.lang, locked: this.locked, history: this.history, text }) });
+          clearTimeout(timer);
+          if (r.ok) {
+            const j = await r.json();
+            if (j.text) {
+              this.history.push({ role: "user", text }, { role: "model", text: j.text });
+              this.history = this.history.slice(-8);
+              return { text: j.text, go: j.go || null };
+            }
+          }
+        } catch (e) {}
+      }
       if (this.ai) {
         try {
           const r = await Promise.race([this.ai.prompt(text), new Promise((_, x) => setTimeout(() => x(new Error("slow")), 6000))]);

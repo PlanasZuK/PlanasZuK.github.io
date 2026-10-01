@@ -384,7 +384,7 @@
     // a mouse: press and drag to wipe the glass
     // what people write on the glass is read, and can take them somewhere
     let holdLabel = 0;
-    const vEl = $(".voice"), voice = window.Voice && vEl ? new Voice(vEl, { lang: LANG, locked: ["work", "about", "services", "contact"].filter(isLocked) }) : null;
+    const vEl = $(".voice"), voice = window.Voice && vEl ? new Voice(vEl, { lang: LANG, locked: ["work", "about", "services", "contact"].filter(isLocked), endpoint: vEl.dataset.ai }) : null;
     const vx = vEl ? gsap.quickTo(vEl, "x", { duration: 0.35, ease: "power3" }) : () => {}, vy = vEl ? gsap.quickTo(vEl, "y", { duration: 0.35, ease: "power3" }) : () => {};
     if (vEl) gsap.set(vEl, { x: innerWidth * 0.5 - 120, y: innerHeight * 0.62 });
     const sections = ["work", "about", "services", "contact"];
