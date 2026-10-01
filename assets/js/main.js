@@ -398,6 +398,8 @@
     if (!c || !window.Rain || !Rain.supported) return {};
     const rain = new Rain(c, { img: c.dataset.img, mask: c.dataset.mask, reduce });
     rain.onLand = (x, s) => { if (window.Sound && Sound.on) Sound.tap(x, s); };
+    rain.onTouch = (down, x) => { if (window.Sound) Sound.touch(down, x); };
+    rain.onWet = (s) => { if (window.Sound) Sound.wet(s); };
     const live = () => mode !== "page" && !busy;
     const tx = gsap.quickTo(tip, "x", { duration: 0.2, ease: "power3" }), ty = gsap.quickTo(tip, "y", { duration: 0.2, ease: "power3" });
     // a mouse: press and drag to wipe the glass
@@ -410,6 +412,12 @@
     const effect = (k) => {
       if (k === "sun") gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 4, ease: "sine.inOut" }, "+=9");
       if (k === "rain") gsap.timeline().to(rain.state, { storm: 1, duration: 2, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 5, ease: "sine.inOut" }, "+=10");
+      // drawn on the glass: the hour and the sky answer
+      const hour = (to) => { DAY.n = DAY.nv = 0; gsap.to(DAY, { t: to, duration: reduce ? 0 : 3.5, ease: "sine.inOut" }); };
+      if (k === "day") { hour(0.2); gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 5, ease: "sine.inOut" }, "+=12"); }
+      if (k === "night") hour(1);
+      if (k === "cloud") gsap.timeline().to(rain.state, { storm: 0.45, duration: 3, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 6, ease: "sine.inOut" }, "+=20");
+      if (k === "storm") { gsap.timeline().to(rain.state, { storm: 1, duration: 2.5, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 6, ease: "sine.inOut" }, "+=18"); gsap.delayedCall(2.6, () => { rain.state.flash = 0.9; gsap.to(rain.state, { flash: 0, duration: 1, ease: "power2.out" }); if (window.Sound) Sound.thunder(0.15); }); }
     };
     // every turn of the conversation goes through here
     const handle = async (input) => {
@@ -478,10 +486,12 @@
     const slope = (d) => { let i = 0; while (i < KEYS.length - 2 && d >= KEYS[i + 1].at) i++; return (KEYS[i + 1].h - KEYS[i].h) / (KEYS[i + 1].at - KEYS[i].at); };
     const lerp = (a, b, t) => (Array.isArray(a) ? a.map((v, i) => v + (b[i] - v) * t) : a + (b - a) * t);
     let lastLabel = "";
+    let hourNow = 7;
     const day = (d) => {
       let i = 0;
       while (i < KEYS.length - 2 && d > KEYS[i + 1].at) i++;
       const A = KEYS[i], B = KEYS[i + 1], u = Math.min(1, Math.max(0, (d - A.at) / (B.at - A.at))), t = u * u * (3 - 2 * u);
+      hourNow = (A.h + (B.h - A.h) * u) % 24;
       const g = rain.state.grade;
       for (const k of ["sat", "bright", "contrast", "tint", "lift", "glow"]) g[k] = lerp(A[k], B[k], t);
       rain.state.night = lerp(A.night, B.night, t);
@@ -532,7 +542,7 @@
     });
     // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
     if (voice && !/[?&]nobrain\b/.test(location.search)) voice.wake();
-    return { rain, day, slope, voice, greet, wiping: () => wiping };
+    return { rain, day, slope, voice, greet, hour: () => hourNow, wiping: () => wiping };
   })();
 
   /* ---------------- the preview that follows the pointer over lists ---------------- */
@@ -886,10 +896,11 @@
         gsap.ticker.remove(tick);
         // the hero logo sits exactly under this one: once the dark lifts, it simply stays
         gsap.set(".hero__title", { visibility: "visible" });
-        gsap.timeline({ onComplete: () => { el.remove(); done(true); } })
+        const enter = () => { if (window.Sound) Sound.enter(); };
+        gsap.timeline({ onComplete: () => { el.remove(); enter(); done(true); } })
           .to(st, { shown: 1, duration: 0.45, ease: "power2.out", onUpdate: put })
-          .to([trace, pct, skip], { opacity: 0, duration: 0.5, ease: "power1.out" }, 0.15)
-          .add(() => { if (introTl) introTl.play(); }, 0.5)
+          .to([trace, pct, skip, $(".loader__sound", el)], { opacity: 0, duration: 0.5, ease: "power1.out" }, 0.15)
+          .add(() => { if (introTl) introTl.play(); enter(); }, 0.5)
           .to(el, { backgroundColor: "rgba(5, 6, 5, 0)", duration: reduce ? 0 : 1.3, ease: "power2.inOut" }, 0.5)
           .set($(".loader__logo", el), { opacity: 0 });
       };
@@ -930,7 +941,9 @@
     // the sound follows the scene: rain, wind, hour, storm, the camera pulling back, the fingertip
     if (window.Sound && Sound.on && hero.rain) {
       const r = hero.rain, s = r.state;
-      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0 }, now);
+      Sound.fingerMove(r.finger ? r.fspeed || 0 : 0, r.finger ? r.finger.x * 2 - 1 : 0, r.fturn || 0, now);
+      if (r.fturn > 0.5) r.fturn = 0.49;
+      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, hour: hero.hour ? hero.hour() : 12, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0 }, now);
     }
   });
   const fontsReady = Promise.race([d.fonts ? d.fonts.ready : Promise.resolve(), new Promise((res) => setTimeout(res, 1600))]);

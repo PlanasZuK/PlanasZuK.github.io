@@ -489,8 +489,15 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
   // into English before, and its answer into the page's language after. On-device (Chrome's Translator)
   // when that language pack is already there, otherwise Google Translate's free endpoint.
   const TRC = new Map(), TRN = {};
+  // names a translator must never touch ("Planas" is also a Spanish word, so it gets translated or bent):
+  // swapped for a placeholder before, put back after, and any bent version still left is mended
+  const NAME = /\bPol\s+Plan\w*|\bPlanas\b|polplanas\.com/gi;
+  const mend = (s) => s.replace(/\bPol\s+(Plan\w*|Plane[st]|Plana|Flat\w*|Llan\w*)/gi, "Pol Planas").replace(/\bPlansas\b/gi, "Planas");
   async function translate(text, sl, tl) {
     if (!text || sl === tl) return text;
+    const kept = [];
+    text = text.replace(NAME, (m) => { kept.push(/\.com$/i.test(m) ? "polplanas.com" : /^pol/i.test(m) ? "Pol Planas" : "Planas"); return `ZQX${kept.length - 1}`; });
+    const back = (s) => s && mend(s.replace(/ZQX\s*(\d)/g, (_, i) => kept[+i] || ""));
     const key = sl + ">" + tl + ":" + text;
     if (TRC.has(key)) return TRC.get(key);
     let out = null;
@@ -509,6 +516,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
         out = (j[0] || []).map((x) => x[0]).join("").trim() || null;
       } catch (e) {}
     }
+    out = back(out);
     if (out) TRC.set(key, out);
     return out;
   }
@@ -558,22 +566,25 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       if (this.tw) this.tw.kill();
       el.classList.add("is-on");
       const o = { n: 0 };
-      if (window.Sound) Sound.voice(text.length);
+      // with sound on, the letters come at the pace the little voice speaks them
+      const loud = window.Sound && Sound.on, dur = loud ? Math.min(2.8, 0.034 * text.length + 0.25) : Math.min(1.4, 0.022 * text.length + 0.2);
+      if (loud) Sound.voice(text, dur);
       this.tw = gsap.timeline()
-        .to(o, { n: text.length, duration: Math.min(1.4, 0.022 * text.length + 0.2), ease: "none", onUpdate: () => { el.textContent = text.slice(0, Math.round(o.n)); } })
+        .to(o, { n: text.length, duration: dur, ease: "none", onUpdate: () => { el.textContent = text.slice(0, Math.round(o.n)); } })
         .call(() => el.classList.remove("is-on"), null, `+=${hold}`);
       return this.tw;
     }
     // the voice is thinking: three dots that breathe one after another
     typing(hold = 20) {
       const el = this.el;
+      if (window.Sound && this.showing !== "typing") Sound.think();
       if (this.tw) this.tw.kill();
       this.showing = "typing";
       el.innerHTML = '<span class="dots" aria-label="…"><i></i><i></i><i></i></span>';
       el.classList.add("is-on");
       this.tw = gsap.timeline().call(() => el.classList.remove("is-on"), null, hold);
     }
-    hush() { if (this.tw) this.tw.kill(); this.el.classList.remove("is-on"); }
+    hush() { if (this.tw) this.tw.kill(); this.el.classList.remove("is-on"); if (window.Sound && Sound.stopThinking) Sound.stopThinking(); }
     // the open model runs only on a computer with WebGPU, never on a metered connection
     async eligible() {
       try {
@@ -678,8 +689,16 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       if (spare) return this.reply(spare, text);
       return { text: count(c) > 3 ? this.t("unsure") : this.t("unknown", text) };
     }
-    // what a drawing tells: AutoDraw scores are distances, lower is surer
+    // a drawn sun, moon, cloud or lightning also changes the sky: a small secret of the window
     async drawing(draw, now) {
+      const r = await this.drawing0(draw, now), a = draw[0];
+      const sure = a && (a.s <= 1.5 || (draw[1] ? draw[1].s - a.s >= 0.9 : true));
+      const sky = sure && { sun: "day", rainbow: "day", moon: "night", star: "night", cloud: "cloud", umbrella: "cloud", rain: "cloud", snowflake: "cloud", lightning: "storm" }[a.l];
+      if (sky && r) r.fx = sky;
+      return r;
+    }
+    // what a drawing tells: AutoDraw scores are distances, lower is surer
+    async drawing0(draw, now) {
       this.expectDraw = 0; this.askedBiz = true;
       const [a, b] = draw, gap = b ? b.s - a.s : 9, L = this.lang;
       const noun = (d) => d && NOUNS[d.l] && NOUNS[d.l][L];

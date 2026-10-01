@@ -457,7 +457,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       } else for (const a of G.map.values()) a.length = 0;
       for (const q of this.drops) G.add(q);
     }
-    down(cx, cy) { const p = this.local(cx, cy); if (!p) return false; this.finger = { x: p.x, y: p.y, still: 0 }; this.wipe(p.x, p.y, p.x, p.y); return true; }
+    down(cx, cy) { const p = this.local(cx, cy); if (!p) return false; this.finger = { x: p.x, y: p.y, still: 0 }; if (this.onTouch) this.onTouch(true, p.x * 2 - 1); this.wipe(p.x, p.y, p.x, p.y); return true; }
     move(cx, cy) {
       const p = this.local(cx, cy, true), k = this.P.parallax;
       this.par.tx = (p.x - 0.5) * -0.01 * k; this.par.ty = (p.y - 0.5) * 0.007 * k;
@@ -466,10 +466,13 @@ void main() { o = texture(uSp, vT) * vA; }`;
       // how fast the fingertip moves, in screen widths per second, for its sound
       const tn = performance.now(), sp = Math.hypot((p.x - x0) * this.W, (p.y - y0) * this.H) / Math.max(8, tn - (f.t || tn - 16)) * 1000 / 1400;
       f.t = tn; this.fspeed = Math.max(this.fspeed || 0, Math.min(1.5, sp));
+      // a change of direction (the finger turning back) catches the skin on the glass
+      const dx = p.x - x0, dy = p.y - y0, dl = Math.hypot(dx * this.W, dy * this.H);
+      if (dl > 2) { const ux = (dx * this.W) / dl, uy = (dy * this.H) / dl; if (f.ux !== undefined && ux * f.ux + uy * f.uy < 0.2) this.fturn = 1; f.ux = ux; f.uy = uy; }
       f.x = p.x; f.y = p.y; f.still = 0;
       this.wipe(x0, y0, f.x, f.y);
     }
-    up() { this.finger = null; }
+    up() { if (this.finger && this.onTouch) this.onTouch(false, this.finger.x * 2 - 1); this.finger = null; }
     local(cx, cy, any) {
       const r = this.c.getBoundingClientRect(), x = (cx - r.left) / r.width, y = (cy - r.top) / r.height;
       return any || (x >= 0 && x <= 1 && y >= 0 && y <= 1) ? { x, y } : null;
@@ -491,7 +494,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
         f.fillStyle = gr; f.fillRect(x - rad, y - rad, rad * 2, rad * 2);
         g.fillStyle = "rgba(255,255,255,0.03)"; g.beginPath(); g.arc(x, y, rad * 0.75, 0, 6.283); g.fill();
         const wx = x * ws, wy = y * ws, wr = rad * ws * 0.9;
-        for (const q of this.near(wx, wy, wr + 14 * this.k)) { const ex = q.x - wx, ey = q.y - wy; if (!q.dead && ex * ex + ey * ey < wr * wr) q.dead = true; }
+        for (const q of this.near(wx, wy, wr + 14 * this.k)) { const ex = q.x - wx, ey = q.y - wy; if (!q.dead && ex * ex + ey * ey < wr * wr) { q.dead = true; if (this.onWet && q.g > 2.5 * this.k) this.onWet(q.g / (this.P.maxSize * this.k)); } }
         if (len && Math.random() < 0.6) {
           const side = Math.random() < 0.5 ? -1 : 1, o = wr * rnd(0.92, 1.08);
           this.quiet = true;
@@ -648,6 +651,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       this.last = now;
       this.adapt(raw, now);
       this.fspeed = (this.fspeed || 0) * Math.exp(-dt * 9);
+      this.fturn = (this.fturn || 0) * Math.exp(-dt * 12);
       if (!this.o.reduce) this.step(dt);
       else if (this.finger) this.step(0);
       this.draw();
