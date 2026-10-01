@@ -1,9 +1,9 @@
 /* voice.js — a small voice beside the fingertip, with a sense of humour.
    It types its lines one letter at a time and reacts to whatever people write on the glass: a greeting,
-   a rude word, a food, a number, a name, anything. Section words take you there. When the browser carries
-   its own on-device language model (Chrome's built-in Gemini Nano: free, nothing leaves the device), the
-   voice asks it, briefed on who Pol is and told to be funny; otherwise it answers from its own repertoire,
-   never with the same line twice in a row. */
+   a rude word, a food, a number, a name, anything. Section words take you there.
+   For anything its repertoire does not know, an open model runs inside the visitor's own browser
+   (Gemma 3 1B through WebGPU, see brain-worker.js): no server, no key, no cost. It wakes only when someone
+   writes something new, only on computers, and is cached afterwards; until then the repertoire answers. */
 (() => {
   const pick = (a) => a[(Math.random() * a.length) | 0];
   const clean = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, "").trim();
@@ -33,6 +33,8 @@
     en: {
       hello: "Hi. Press and drag to write on the glass. Anything. I’ll read it.",
       reading: "Reading…",
+      waking: (p) => (p > 2 ? `Hold on, my brain is waking up… ${p}%` : "Hold on, I’m waking up my brain…"),
+      awake: "I’m awake. Write me anything.",
       work: "Going to show you my work…", about: "Let me tell you who I am…", services: "Here’s what I can do for you…", contact: "Let’s talk. Taking you there…",
       soon: ["That page is still drying. Come back very soon.", "Almost ready. I’m painting the last pixels.", "Not open yet. Even the rain is waiting for it."],
       hi: ["Hello! Lovely weather, isn’t it?", "Hi there. Mind the drops.", "Hello. You write nicely on wet glass."],
@@ -61,6 +63,8 @@
     ca: {
       hello: "Hola. Prem i arrossega per escriure al vidre. El que vulguis. Ho llegiré.",
       reading: "Llegint…",
+      waking: (p) => (p > 2 ? `Un moment, que desperto el cervell… ${p}%` : "Un moment, que desperto el cervell…"),
+      awake: "Ja estic despert. Escriu-me el que vulguis.",
       work: "Anem a veure la meva feina…", about: "Et explico qui soc…", services: "Això és el que puc fer per tu…", contact: "Parlem. Et porto allà…",
       soon: ["Aquesta pàgina encara s’està assecant. Torna aviat.", "Gairebé a punt. Estic pintant els últims píxels.", "Encara no és oberta. Fins i tot la pluja l’espera."],
       hi: ["Hola! Quin temps més bo, oi?", "Hola. Compte amb les gotes.", "Hola. Escrius molt bé sobre vidre mullat."],
@@ -89,6 +93,8 @@
     es: {
       hello: "Hola. Pulsa y arrastra para escribir en el cristal. Lo que quieras. Lo leeré.",
       reading: "Leyendo…",
+      waking: (p) => (p > 2 ? `Un momento, que despierto el cerebro… ${p}%` : "Un momento, que despierto el cerebro…"),
+      awake: "Ya estoy despierto. Escríbeme lo que quieras.",
       work: "Vamos a ver mi trabajo…", about: "Te cuento quién soy…", services: "Esto es lo que puedo hacer por ti…", contact: "Hablemos. Te llevo allí…",
       soon: ["Esa página aún se está secando. Vuelve pronto.", "Casi lista. Estoy pintando los últimos píxeles.", "Todavía no abre. Hasta la lluvia la espera."],
       hi: ["¡Hola! Qué buen tiempo hace, ¿eh?", "Hola. Cuidado con las gotas.", "Hola. Escribes muy bien sobre cristal mojado."],
@@ -115,38 +121,32 @@
       blank: ["Tu letra es… artística. ¿Un poco más grande?", "No he podido leerlo. Hasta los médicos escriben mejor.", "¿Era una palabra o un dibujo? Ambos son bienvenidos."],
     },
   };
-  const BRIEF = (lang, locked) => `You are the voice of polplanas.com, the website of Pol Planas, and you speak as Pol, in first person.
-
-WHO POL IS
-- A freelance web designer (autònom) in Catalonia, Spain. He designs and builds websites for small businesses that are very good at what they do: studios, shops, restaurants, clinics, makers, brands.
-- One person from the first call to launch: the person you brief is the person who does the work. Nobody in between.
-- Works in Catalan, Spanish and English. Available for new projects from November 2026.
-- What he sells is not pages but clients: websites that make a stranger choose your business and get in touch.
-
-HOW IT WORKS
-- A free first call, no commitment. Then a fixed price, agreed before starting.
-- The homepage is designed in week two; launch around week five; 30 days of changes included after launch.
-- Prices (VAT not included): landing page from €1,200 (about 2 weeks); website from €2,900 (4–5 weeks); website + identity (logo, colours, type) from €4,900 (6–8 weeks); optional care plan €60/month (hosting, updates, small changes).
-- He replies within one working day. Email: pol@polplanas.com. The "Start a project" card at the bottom right writes to him.
-
-WHERE YOU ARE
-- The landing page: a window on a rainy day, a harebell in a meadow behind fogged glass. Visitors wipe the fog and write on it with a finger; you read what they write and answer beside the fingertip. Scrolling passes the day from morning to night, then shows all the pages of the site.
-- Pages: Work (projects), About (who I am), Services (prices and what is included), Contact.${locked.length ? ` Not open yet (coming very soon): ${locked.join(", ")}. If they ask for one of those, say it is almost ready and offer the email instead.` : ""}
-
-YOUR PURPOSE (never say it)
-- Like the best salesperson in a showroom: charming, curious, helpful, never pushy. React first to exactly what they wrote, with wit (play with the word, the rain, the glass). Then, when it fits, turn the talk to them: what their business is, what they need. About one reply in three, gently suggest the next step: a free first call, writing to pol@polplanas.com, or the "Start a project" card. Never repeat the same pitch twice. Never invent facts, clients, discounts or dates.
-
-STYLE
-- One or two short sentences, at most 22 words in total. Warm, cheeky, never rude, no emojis, no quotes, no lists.
-- Reply in ${({ ca: "Catalan", es: "Spanish" })[lang] || "English"}, unless they clearly write in another language: then use theirs.
-- Only if they clearly want to see a page that is open, end with exactly one tag: [go:work], [go:about], [go:services] or [go:contact].`;
+  // the brain: an open model in the visitor's browser, briefed with a few facts and a few examples of the tone
+  const FACTS = {
+    en: "You are Pol Planas, a friendly, witty freelance web designer from Catalonia who makes websites for small businesses so they get more clients. Landing page from €1,200, website from €2,900, website and brand from €4,900. Free first call, fixed price, about five weeks. Email pol@polplanas.com. The rest of the site opens very soon. The visitor wrote something with a finger on your rainy, fogged window. Reply in English with one short, funny sentence about exactly what they wrote (max 18 words), and now and then ask about their business or invite them to write to you.",
+    ca: "Ets en Pol Planas, un dissenyador web autònom de Catalunya, simpàtic i amb gràcia, que fa webs per a petits negocis perquè tinguin més clients. Landing des de 1.200 €, web des de 2.900 €, web i marca des de 4.900 €. Primera trucada gratis, preu tancat, unes cinc setmanes. Correu pol@polplanas.com. La resta de la web obre molt aviat. El visitant ha escrit alguna cosa amb el dit al teu vidre entelat i plujós. Respon en català amb una sola frase curta i divertida sobre el que ha escrit (màxim 18 paraules) i, de tant en tant, pregunta pel seu negoci o convida’l a escriure’t.",
+    es: "Eres Pol Planas, un diseñador web autónomo de Cataluña, simpático y con gracia, que hace webs para pequeños negocios para que tengan más clientes. Landing desde 1.200 €, web desde 2.900 €, web y marca desde 4.900 €. Primera llamada gratis, precio cerrado, unas cinco semanas. Correo pol@polplanas.com. El resto de la web abre muy pronto. El visitante ha escrito algo con el dedo en tu cristal empañado y lluvioso. Responde en español con una sola frase corta y divertida sobre lo que ha escrito (máximo 18 palabras) y, de vez en cuando, pregunta por su negocio o invítale a escribirte.",
+  };
+  const SHOTS = {
+    en: [["coffee", "Black, no sugar, like this website. What’s your business?"], ["pizza", "Now I’m hungry. Does your pizzeria have a website yet?"], ["dragon", "A dragon? I design websites, but I’d make an exception for a dragon’s shop."], ["bored", "Bored? Write the name of your business and I’ll imagine its website."]],
+    ca: [["cafè", "Sol i sense sucre, com aquesta web. A què et dediques?"], ["pizza", "Ara tinc gana. La teva pizzeria ja té web?"], ["drac", "Un drac? Faig webs, però per a la botiga d’un drac faria una excepció."], ["avorrit", "Avorrit? Escriu el nom del teu negoci i m’imagino la seva web."], ["tinc una fleca", "Una fleca! Ja sento l’olor de pa. Quants clients et trobarien amb una bona web?"], ["bicicleta", "Una bicicleta! Jo pedalo amb píxels. Tens una botiga o un taller?"], ["gat", "Un gat! Segur que mana més que tu. A què et dediques, a part de servir-lo?"], ["platja", "La platja, amb aquesta pluja? Somiar és gratis, i la primera trucada també."]],
+    es: [["café", "Solo y sin azúcar, como esta web. ¿A qué te dedicas?"], ["pizza", "Ahora tengo hambre. ¿Tu pizzería ya tiene web?"], ["dragón", "¿Un dragón? Hago webs, pero por la tienda de un dragón haría una excepción."], ["aburrido", "¿Aburrido? Escribe el nombre de tu negocio y me imagino su web."]],
+  };
+  // a small model sometimes rambles: keep one or two clean sentences, or nothing
+  const tidy = (s) => {
+    let t = (s || "").replace(/\*\*?|__|#+|`/g, "").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").replace(/\s+/g, " ").trim();
+    t = t.replace(/^["“'«]+|["”'»]+$/g, "").trim();
+    const parts = t.match(/[^.!?]*[.!?]+/g) || [t];
+    let out = "";
+    for (const q of parts) { if ((out + q).split(/\s+/).length > 24) break; out += q; if (out.split(/\s+/).length > 9) break; }
+    out = out.trim();
+    return out.split(/\s+/).length >= 3 && out.length <= 170 && !/[:;]$/.test(out) ? out : "";
+  };
 
   class Voice {
-    constructor(el, { lang = "en", locked = [], endpoint = "" } = {}) {
+    constructor(el, { lang = "en", locked = [] } = {}) {
       this.el = el; this.lang = LINES[lang] ? lang : "en"; this.L = LINES[this.lang]; this.locked = locked;
-      this.endpoint = endpoint; this.history = [];
-      this.tw = null; this.ai = null; this.last = "";
-      this.prepare();
+      this.history = []; this.tw = null; this.brain = null; this.last = "";
     }
     // a line from the repertoire, never the same twice in a row
     t(k, ...a) {
@@ -156,12 +156,7 @@ STYLE
         if (out !== this.last || i === 3) { this.last = out; return out; }
       }
     }
-    react(raw) {
-      const w = raw.trim(), c = clean(w), words = c.split(/\s+/), joined = c.replace(/\s+/g, "");
-      if (/^\d+$/.test(joined)) return this.t("number", w);
-      for (const th of THEMES) if (th.w.some((x) => (x.includes(" ") ? c.includes(x) : words.includes(x)) || joined === x.replace(/\s+/g, ""))) return this.t(th.k, w);
-      return this.t("unknown", w);
-    }
+    react(raw) { return this.theme(raw) || this.t("unknown", raw.trim()); }
     say(text, hold = 3.2) {
       const el = this.el;
       if (this.tw) this.tw.kill();
@@ -173,40 +168,63 @@ STYLE
       return this.tw;
     }
     hush() { if (this.tw) this.tw.kill(); this.el.classList.remove("is-on"); }
-    async prepare() {
-      try {
-        const LM = window.LanguageModel;
-        if (!LM || !LM.availability) return;
-        if ((await LM.availability()) === "available") this.ai = await LM.create({ initialPrompts: [{ role: "system", content: BRIEF(this.lang, this.locked) }], temperature: 0.9, topK: 40 });
-      } catch (e) { this.ai = null; }
+    // known themes: the repertoire answers at once
+    theme(raw) {
+      const w = raw.trim(), c = clean(w), words = c.split(/\s+/), joined = c.replace(/\s+/g, "");
+      if (/^\d+$/.test(joined)) return this.t("number", w);
+      for (const th of THEMES) if (th.w.some((x) => (x.includes(" ") ? c.includes(x) : words.includes(x)) || joined === x.replace(/\s+/g, ""))) return this.t(th.k, w);
+      return null;
     }
-    // whatever they wrote: the on-device model if there is one, the repertoire otherwise
+    // the open model wakes up only for people who write something the repertoire does not know,
+    // only on a computer with WebGPU, never on a metered connection
+    async eligible() {
+      try {
+        if (!navigator.gpu || matchMedia("(pointer: coarse)").matches) return false;
+        const c = navigator.connection;
+        if (c && (c.saveData || /2g/.test(c.effectiveType || ""))) return false;
+        if (navigator.deviceMemory && navigator.deviceMemory < 4) return false;
+        return !!(await navigator.gpu.requestAdapter());
+      } catch (e) { return false; }
+    }
+    async wake() {
+      if (this.brain) return;
+      this.brain = { ready: false, progress: 0, waiting: new Map(), n: 0 };
+      if (!(await this.eligible())) { this.brain.off = true; return; }
+      try {
+        const w = new Worker("/assets/js/brain-worker.js", { type: "module" });
+        this.brain.w = w;
+        w.onmessage = (e) => {
+          const m = e.data, b = this.brain;
+          if (m.type === "progress") b.progress = m.value;
+          if (m.type === "ready") { b.ready = true; if (!this.el.classList.contains("is-on")) this.say(this.t("awake"), 3.5); }
+          if (m.type === "error") b.off = true;
+          if (m.type === "answer" && b.waiting.has(m.id)) { b.waiting.get(m.id)(m.text); b.waiting.delete(m.id); }
+        };
+        w.postMessage({ type: "load" });
+      } catch (e) { this.brain.off = true; }
+    }
+    think(text) {
+      const b = this.brain, id = ++b.n;
+      const msgs = [{ role: "system", content: FACTS[this.lang] }, ...SHOTS[this.lang].flatMap(([u, a]) => [{ role: "user", content: u }, { role: "assistant", content: a }]), ...this.history, { role: "user", content: text }];
+      return Promise.race([
+        new Promise((res) => { b.waiting.set(id, res); b.w.postMessage({ type: "ask", id, messages: msgs, temperature: this.lang === "ca" ? 0.45 : 0.7 }); }),
+        new Promise((res) => setTimeout(() => res(""), 12000)),
+      ]);
+    }
     async answer(text) {
-      // first choice, for everyone: the site's own little server, which asks Gemini
-      if (this.endpoint) {
-        try {
-          const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 7000);
-          const r = await fetch(this.endpoint, { method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: this.lang, locked: this.locked, history: this.history, text }) });
-          clearTimeout(timer);
-          if (r.ok) {
-            const j = await r.json();
-            if (j.text) {
-              this.history.push({ role: "user", text }, { role: "model", text: j.text });
-              this.history = this.history.slice(-8);
-              return { text: j.text, go: j.go || null };
-            }
-          }
-        } catch (e) {}
-      }
-      if (this.ai) {
-        try {
-          const r = await Promise.race([this.ai.prompt(text), new Promise((_, x) => setTimeout(() => x(new Error("slow")), 6000))]);
-          const go = (r.match(/\[go:(work|about|services|contact)\]/) || [])[1] || null;
-          const out = r.replace(/\[go:[a-z]+\]/g, "").replace(/^["“]|["”]$/g, "").trim();
-          if (out) return { text: out, go };
-        } catch (e) {}
-      }
-      return { text: this.react(text), go: null };
+      const known = this.theme(text);
+      if (known) return { text: known, go: null };
+      if (!this.brain) await this.wake();
+      const b = this.brain;
+      if (b && b.ready) {
+        const out = tidy(await this.think(text));
+        if (out) {
+          this.history.push({ role: "user", content: text }, { role: "assistant", content: out });
+          this.history = this.history.slice(-2);
+          return { text: out, go: null };
+        }
+      } else if (b && !b.off && b.w) return { text: this.t("waking", Math.round(b.progress * 100)), go: null };
+      return { text: this.t("unknown", text), go: null };
     }
   }
   window.Voice = Voice;
