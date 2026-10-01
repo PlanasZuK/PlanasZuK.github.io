@@ -406,8 +406,9 @@ void main() { o = texture(uSp, vT) * vA; }`;
     // never while the page is loading or the voice's model is thinking on the same graphics card
     adapt(raw, now) {
       const a = this.ad || (this.ad = { ema: 16.7, slow: 0, fast: 0 });
+      // the frame time is always followed (the AI guard reads it); quality only changes outside loading and thinking
+      a.ema += (Math.min(raw, 250) - a.ema) * 0.05;
       if (raw > 250 || document.getElementById("loader") || window.__thinking) { a.slow = a.fast = 0; return; }
-      a.ema += (raw - a.ema) * 0.05;
       const floor = (devicePixelRatio || 1) >= 1.5 ? 1 / Math.min(devicePixelRatio, this.o.dpr) : 0.75;
       if (a.ema > 24) { a.fast = 0; a.slow += raw; } else if (a.ema < 15) { a.slow = 0; a.fast += raw; } else a.slow = a.fast = 0;
       const q = this.q || 1;

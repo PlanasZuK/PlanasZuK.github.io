@@ -601,6 +601,15 @@
     });
     // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
     const noBrain = /[?&]nobrain\b/.test(location.search);
+    // a guard for any machine: if the model makes the window stutter for several seconds, it is let go,
+    // and the written lines carry the conversation on
+    let heavy = 0;
+    setInterval(() => {
+      const b = voice && voice.brain, ad = rain && rain.ad;
+      if (!b || b.off || !b.w || !ad || document.hidden) { heavy = 0; return; }
+      heavy = ad.ema > 40 ? heavy + 1 : 0;
+      if (heavy >= 5) { try { b.w.terminate(); } catch (e) {} b.off = true; b.ready = false; b.status = "let go: too heavy for this machine"; console.info("[cervell] let go: the window was stuttering"); }
+    }, 1000);
     return { rain, day, slope, voice, greet, hour: () => hourNow, wiping: () => wiping };
   })();
 
