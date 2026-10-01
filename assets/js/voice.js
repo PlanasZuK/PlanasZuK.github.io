@@ -9,7 +9,11 @@
   const clean = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, "").trim();
 
   // the themes it recognises in any of the three languages, and what it says about them
+  const YES = ["yes", "yeah", "yep", "yup", "sure", "ok", "okay", "si", "vale", "dacord", "clar", "claro", "venga", "va", "endavant", "adelante", "please", "siusplau", "porfavor", "of course", "is"];
+  const NO = ["no", "nope", "nah", "not now", "ara no", "ahora no", "never", "mai", "nunca", "no gracies", "no gracias", "no thanks"];
+  const has = (c, list) => { const words = c.split(/\s+/), j = c.replace(/\s+/g, ""); return list.some((x) => (x.includes(" ") ? c.includes(x) : words.includes(x)) || j === x.replace(/\s+/g, "")); };
   const THEMES = [
+    { k: "how", w: ["how are you", "how r u", "howareyou", "com estas", "comestas", "que tal", "quetal", "como estas", "comoestas", "how is it going", "whats up", "sup"] },
     { k: "hi", w: ["hello", "hola", "hey", "hi", "bon dia", "bondia", "buenas", "holi", "bona tarda", "buenos dias"] },
     { k: "price", w: ["price", "prices", "preu", "preus", "precio", "precios", "cost", "quant costa", "cuanto cuesta", "how much", "pressupost", "presupuesto", "budget"] },
     { k: "web", w: ["web", "website", "webs", "pagina", "pagina web", "landing", "shop", "botiga", "tienda", "ecommerce", "disseny", "diseno", "design", "logo", "marca", "brand", "fesme una web", "hazme una web", "make me a website"] },
@@ -33,6 +37,13 @@
     en: {
       hello: "Press and drag to write on the glass. Anything you like, I’ll read it.",
       reading: "Reading…",
+      offerServices: "Want me to show you what’s included? Write “yes”.",
+      offerWork: "Want to see some of my work? Write “yes”.",
+      offerMail: "Want to tell me about it? Write “yes” and I’ll open an email.",
+      mailOpen: "Opening your email. I reply within one working day.",
+      declined: ["No problem. Write me anything else.", "Fair enough. The rain and I will be right here.", "Okay. I’ll keep the glass warm."],
+      soonOffer: "That page opens very soon. Want to write to me meanwhile? Write “yes”.",
+      how: ["Wet, but happy. And you? How’s business?", "A bit foggy today. What about you?", "Better now that someone’s writing to me. How are you?"],
       waking: (p) => (p > 2 ? `Hold on, my brain is waking up… ${p}%` : "Hold on, I’m waking up my brain…"),
       awake: "I’m awake. Write me anything.",
       nobrain: "My AI brain needs a computer with a recent Chrome or Edge. Here, I answer from memory.",
@@ -42,7 +53,7 @@
       hi: ["Hello! Lovely weather, isn’t it?", "Hi there. Mind the drops.", "Hello. You write nicely on wet glass."],
       sun: "Let the sun out for a moment.", rain: "More rain, then. Bring an umbrella.", home: "You’re already home. Cosy, isn’t it?",
       price: ["Landing pages from €1,200, full websites from €2,900. Rain included.", "From €1,200. The weather here is free."],
-      web: ["A website? That’s literally my job. Tell me about your business: pol@polplanas.com", "Say no more. The first call is free, and so is the rain.", "Websites are my favourite weather. What does your business do?"],
+      web: ["A website? That’s literally my job.", "Say no more. The first call is free, and so is the rain.", "Websites are my favourite weather. What does your business do?"],
       bye: ["Leaving already? The rain will miss you.", "Bye! Close the window on your way out."],
       thanks: ["You’re welcome. Write anything, I’m here all day.", "Anytime. It’s not like I can go outside."],
       rude: ["Rude. The rain heard that.", "Wow. I’ll pretend the fog hid it.", "I’m made of water and pixels and still have more manners."],
@@ -65,6 +76,13 @@
     ca: {
       hello: "Prem i arrossega per escriure al vidre. El que vulguis, ho llegiré.",
       reading: "Llegint…",
+      offerServices: "Vols que t’ensenyi què inclou? Escriu “sí”.",
+      offerWork: "Vols veure una mica de la meva feina? Escriu “sí”.",
+      offerMail: "M’ho vols explicar? Escriu “sí” i t’obro un correu.",
+      mailOpen: "T’obro el correu. Responc en un dia laborable.",
+      declined: ["Cap problema. Escriu-me el que vulguis.", "D’acord. La pluja i jo serem aquí mateix.", "Entesos. Et guardo el vidre calentet."],
+      soonOffer: "Aquesta pàgina obre molt aviat. Mentrestant, m’escrius? Escriu “sí”.",
+      how: ["Mullat, però content. I tu? Com va el negoci?", "Una mica entelat, avui. I tu, què tal?", "Millor ara que algú m’escriu. Com estàs?"],
       waking: (p) => (p > 2 ? `Un moment, que desperto el cervell… ${p}%` : "Un moment, que desperto el cervell…"),
       awake: "Ja estic despert. Escriu-me el que vulguis.",
       nobrain: "El meu cervell d’IA necessita un ordinador amb Chrome o Edge recent. Aquí responc de memòria.",
@@ -74,7 +92,7 @@
       hi: ["Hola! Quin temps més bo, oi?", "Hola. Compte amb les gotes.", "Hola. Escrius molt bé sobre vidre mullat."],
       sun: "Deixem sortir el sol una estona.", rain: "Doncs més pluja. Agafa el paraigua.", home: "Ja ets a casa. S’hi està bé, oi?",
       price: ["Landings des de 1.200 €, webs des de 2.900 €. La pluja, inclosa.", "Des de 1.200 €. El temps d’aquí és gratis."],
-      web: ["Una web? És literalment la meva feina. Explica’m el teu negoci: pol@polplanas.com", "No cal dir res més. La primera trucada és gratis, i la pluja també.", "Les webs són el meu temps preferit. A què es dedica el teu negoci?"],
+      web: ["Una web? És literalment la meva feina.", "No cal dir res més. La primera trucada és gratis, i la pluja també.", "Les webs són el meu temps preferit. A què es dedica el teu negoci?"],
       bye: ["Ja marxes? La pluja et trobarà a faltar.", "Adeu! Tanca la finestra en sortir."],
       thanks: ["De res. Escriu el que vulguis, soc aquí tot el dia.", "Quan vulguis. Tampoc puc sortir a fora."],
       rude: ["Quina educació. La pluja ho ha sentit.", "Uau. Faré veure que el vapor ho ha tapat.", "Soc aigua i píxels i tinc més modals."],
@@ -97,6 +115,13 @@
     es: {
       hello: "Pulsa y arrastra para escribir en el cristal. Lo que quieras, lo leeré.",
       reading: "Leyendo…",
+      offerServices: "¿Quieres que te enseñe qué incluye? Escribe “sí”.",
+      offerWork: "¿Quieres ver un poco de mi trabajo? Escribe “sí”.",
+      offerMail: "¿Me lo cuentas? Escribe “sí” y te abro un correo.",
+      mailOpen: "Te abro el correo. Respondo en un día laborable.",
+      declined: ["Sin problema. Escríbeme lo que quieras.", "Vale. La lluvia y yo seguiremos aquí.", "De acuerdo. Te guardo el cristal calentito."],
+      soonOffer: "Esa página abre muy pronto. Mientras tanto, ¿me escribes? Escribe “sí”.",
+      how: ["Mojado, pero contento. ¿Y tú? ¿Qué tal el negocio?", "Un poco empañado hoy. ¿Y tú qué tal?", "Mejor ahora que alguien me escribe. ¿Cómo estás?"],
       waking: (p) => (p > 2 ? `Un momento, que despierto el cerebro… ${p}%` : "Un momento, que despierto el cerebro…"),
       awake: "Ya estoy despierto. Escríbeme lo que quieras.",
       nobrain: "Mi cerebro de IA necesita un ordenador con Chrome o Edge reciente. Aquí respondo de memoria.",
@@ -106,7 +131,7 @@
       hi: ["¡Hola! Qué buen tiempo hace, ¿eh?", "Hola. Cuidado con las gotas.", "Hola. Escribes muy bien sobre cristal mojado."],
       sun: "Dejemos salir el sol un rato.", rain: "Pues más lluvia. Coge el paraguas.", home: "Ya estás en casa. Se está bien, ¿eh?",
       price: ["Landings desde 1.200 €, webs desde 2.900 €. La lluvia, incluida.", "Desde 1.200 €. El tiempo de aquí es gratis."],
-      web: ["¿Una web? Es literalmente mi trabajo. Cuéntame tu negocio: pol@polplanas.com", "No digas más. La primera llamada es gratis, y la lluvia también.", "Las webs son mi tiempo favorito. ¿A qué se dedica tu negocio?"],
+      web: ["¿Una web? Es literalmente mi trabajo.", "No digas más. La primera llamada es gratis, y la lluvia también.", "Las webs son mi tiempo favorito. ¿A qué se dedica tu negocio?"],
       bye: ["¿Ya te vas? La lluvia te echará de menos.", "¡Adiós! Cierra la ventana al salir."],
       thanks: ["De nada. Escribe lo que quieras, estoy aquí todo el día.", "Cuando quieras. Tampoco puedo salir."],
       rude: ["Qué educación. La lluvia lo ha oído.", "Vaya. Haré como que el vaho lo ha tapado.", "Soy agua y píxeles y tengo más modales."],
@@ -152,7 +177,7 @@
   class Voice {
     constructor(el, { lang = "en", locked = [] } = {}) {
       this.el = el; this.lang = LINES[lang] ? lang : "en"; this.L = LINES[this.lang]; this.locked = locked;
-      this.history = []; this.tw = null; this.brain = null; this.last = "";
+      this.history = []; this.tw = null; this.brain = null; this.last = ""; this.offer = null; this.turns = 0;
     }
     // a line from the repertoire, never the same twice in a row
     t(k, ...a) {
@@ -173,6 +198,15 @@
         .to(o, { n: text.length, duration: Math.min(1.4, 0.022 * text.length + 0.2), ease: "none", onUpdate: () => { el.textContent = text.slice(0, Math.round(o.n)); } })
         .call(() => el.classList.remove("is-on"), null, `+=${hold}`);
       return this.tw;
+    }
+    // the voice is thinking: three dots that breathe one after another
+    typing(hold = 20) {
+      const el = this.el;
+      if (this.tw) this.tw.kill();
+      this.showing = "typing";
+      el.innerHTML = '<span class="dots" aria-label="…"><i></i><i></i><i></i></span>';
+      el.classList.add("is-on");
+      this.tw = gsap.timeline().call(() => el.classList.remove("is-on"), null, hold);
     }
     hush() { if (this.tw) this.tw.kill(); this.el.classList.remove("is-on"); }
     // known themes: the repertoire answers at once
@@ -205,7 +239,7 @@
         w.onmessage = (e) => {
           const m = e.data, b = this.brain;
           if (m.type === "progress") { b.progress = m.value; b.status = "downloading " + Math.round(m.value * 100) + "%"; if (this.showing === "waking") this.el.textContent = this.t("waking", Math.round(m.value * 100)); }
-          if (m.type === "ready") { b.ready = true; b.status = "ready"; console.info("[cervell] ready"); this.showing = ""; this.say(this.t("awake"), 3.5); }
+          if (m.type === "ready") { b.ready = true; b.status = "ready"; console.info("[cervell] ready"); if (!document.getElementById("loader")) { this.showing = ""; this.say(this.t("awake"), 3.5); } }
           if (m.type === "error") { b.off = true; b.status = "error: " + m.message; console.warn("[cervell] error", m.message); if (this.showing === "waking") { this.showing = ""; this.say(this.t("broken"), 4); } }
           if (m.type === "answer" && b.waiting.has(m.id)) { b.waiting.get(m.id)(m.text); b.waiting.delete(m.id); }
         };
@@ -220,9 +254,16 @@
         new Promise((res) => setTimeout(() => res(""), 20000)),
       ]);
     }
-    async answer(text) {
-      const known = this.theme(text);
-      if (known) return { text: known, go: null };
+    // one turn of the conversation: a pending offer first, then known intents, then the brain
+    async answer(text, target = null) {
+      const c = clean(text), now = performance.now();
+      if (this.offer && now < this.offer.until) {
+        const o = this.offer;
+        if (has(c, YES)) { this.offer = null; return this.accept(o.target); }
+        if (has(c, NO)) { this.offer = null; return { text: this.t("declined") }; }
+      }
+      const key = target || THEMES.find((th) => has(c, th.w))?.k || (/^\d+$/.test(c.replace(/\s+/g, "")) ? "number" : null);
+      if (key) return this.reply(key, text.trim());
       if (!this.brain) await this.wake();
       const b = this.brain;
       if (b && b.ready) {
@@ -230,12 +271,35 @@
         console.info("[cervell]", JSON.stringify(text), "→", JSON.stringify(raw), out ? "" : "(discarded)");
         if (out) {
           this.history.push({ role: "user", content: text }, { role: "assistant", content: out });
-          this.history = this.history.slice(-2);
-          return { text: out, go: null };
+          this.history = this.history.slice(-6);
+          // now and then, the next step
+          if (++this.turns % 3 === 0) return this.offering(out, "contact", "offerMail");
+          return { text: out };
         }
-      } else if (b && !b.off && b.w) return { text: this.t("waking", Math.round(b.progress * 100)), go: null, waking: true };
-      if (b && b.off && !this.toldOff) { this.toldOff = true; return { text: this.t(b.status.startsWith("error") ? "broken" : "nobrain"), go: null }; }
-      return { text: this.t("unknown", text), go: null };
+      } else if (b && !b.off && b.w) return { text: this.t("waking", Math.round(b.progress * 100)), waking: true };
+      if (b && b.off && !this.toldOff) { this.toldOff = true; return { text: this.t(b.status.startsWith("error") ? "broken" : "nobrain") }; }
+      return { text: this.t("unknown", text.trim()) };
+    }
+    offering(line, target, key) {
+      this.offer = { target, until: performance.now() + 30000 };
+      return { text: `${line} ${this.t(key)}` };
+    }
+    reply(k, w) {
+      const sections = ["work", "about", "services", "contact"];
+      if (sections.includes(k)) {
+        if (this.locked.includes(k)) { this.offer = { target: "contact", until: performance.now() + 30000 }; return { text: this.t("soonOffer") }; }
+        return { text: this.t(k), go: k };
+      }
+      if (k === "price") return this.offering(this.t("price"), "services", "offerServices");
+      if (k === "web") return this.offering(this.t("web"), "contact", "offerMail");
+      if (k === "hi") return this.offering(this.t("hi"), "work", "offerWork");
+      if (k === "sun" || k === "rain") return { text: this.t(k), fx: k };
+      return { text: this.t(k, w) || this.t("unknown", w) };
+    }
+    accept(target) {
+      if (target === "contact") return { text: this.t("mailOpen"), mail: true };
+      if (this.locked.includes(target)) { this.offer = { target: "contact", until: performance.now() + 30000 }; return { text: this.t("soonOffer") }; }
+      return { text: this.t(target), go: target };
     }
   }
   window.Voice = Voice;

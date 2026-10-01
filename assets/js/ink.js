@@ -37,7 +37,7 @@
     return best;
   }
   class Ink {
-    constructor({ lang = "en", onWord, onRead, onReading, delay = 1000 }) {
+    constructor({ lang = "en", onWord, onRead, onReading, delay = 1900 }) {
       this.lang = lang; this.onWord = onWord; this.onRead = onRead; this.onReading = onReading; this.delay = delay;
       this.strokes = []; this.cur = null; this.timer = null; this.t0 = 0; this.busy = false;
     }
@@ -64,7 +64,7 @@
       if (!ink.length || this.busy) return;
       const xs = ink.flatMap((s) => s[0]), ys = ink.flatMap((s) => s[1]);
       const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
-      if (w < 30 || w > innerWidth * 0.95 || h > innerHeight * 0.8) return;
+      if (w < 24 || h > innerHeight * 0.92) return;
       this.busy = true;
       if (this.onReading) this.onReading();
       try {

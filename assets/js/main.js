@@ -387,28 +387,26 @@
     const vEl = $(".voice"), voice = window.Voice && vEl ? new Voice(vEl, { lang: LANG, locked: ["work", "about", "services", "contact"].filter(isLocked) }) : null;
     const vx = vEl ? gsap.quickTo(vEl, "x", { duration: 0.35, ease: "power3" }) : () => {}, vy = vEl ? gsap.quickTo(vEl, "y", { duration: 0.35, ease: "power3" }) : () => {};
     if (vEl) gsap.set(vEl, { x: innerWidth * 0.5 - 120, y: innerHeight * 0.62 });
-    const sections = ["work", "about", "services", "contact"];
-    const take = (target, line) => {
-      if (isLocked(target)) { voice.say(voice.t("soon")); return; }
-      voice.say(line || voice.t(target), 2.4);
-      gsap.delayedCall(2.4, () => { if (mode === "focus" && !busy) go(target); });
+    const EMAIL = ($(".vcard__row[data-copy]") || { dataset: {} }).dataset.copy || "pol@polplanas.com";
+    const effect = (k) => {
+      if (k === "sun") gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 4, ease: "sine.inOut" }, "+=9");
+      if (k === "rain") gsap.timeline().to(rain.state, { storm: 1, duration: 2, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 5, ease: "sine.inOut" }, "+=10");
+    };
+    // every turn of the conversation goes through here
+    const handle = async (text, target = null) => {
+      if (mode !== "focus" || busy || !voice) return;
+      const a = await voice.answer(text, target);
+      if (!a || !a.text || mode !== "focus") return;
+      const hold = Math.min(9, 2.4 + a.text.length / 22);
+      if (a.fx) effect(a.fx);
+      if (a.go) { voice.say(a.text, 2.4); gsap.delayedCall(2.4, () => { if (mode === "focus" && !busy) go(a.go); }); return; }
+      if (a.mail) { voice.say(a.text, 4); gsap.delayedCall(1.6, () => { location.href = `mailto:${EMAIL}?subject=${encodeURIComponent("polplanas.com")}`; }); return; }
+      voice.say(a.text, a.waking ? 30 : hold, a.waking ? "waking" : "");
     };
     const ink = window.Ink ? new Ink({ lang: LANG,
-      onReading: () => voice && voice.say(voice.t("reading"), 8),
-      onWord: (target) => {
-        if (mode !== "focus" || busy || !voice) return;
-        if (sections.includes(target)) return take(target);
-        if (target === "sun") { voice.say(voice.t("sun")); gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 4, ease: "sine.inOut" }, "+=9"); return; }
-        if (target === "rain") { voice.say(voice.t("rain")); gsap.timeline().to(rain.state, { storm: 1, duration: 2, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 5, ease: "sine.inOut" }, "+=10"); return; }
-        voice.say(voice.t(target) || voice.t("hi"));
-      },
-      onRead: async (cands) => {
-        if (mode !== "focus" || busy || !voice) return;
-        if (!cands.length) { voice.say(voice.t("blank")); return; }
-        const a = await voice.answer(cands[0]);
-        if (a && a.text) { if (a.go) take(a.go, a.text); else voice.say(a.text, a.waking ? 30 : 4.5, a.waking ? "waking" : ""); }
-        else voice.say(voice.t("unknown", cands[0]), 4);
-      },
+      onReading: () => voice && voice.typing(20),
+      onWord: (target, word, cands) => handle(cands[0] || word, target),
+      onRead: (cands) => (cands.length ? handle(cands[0]) : voice && voice.say(voice.t("blank"), 3.5)),
     }) : null;
     let wrote = false, lastHint = 0;
     const introEnd = performance.now() + (reduce ? 800 : 4600);
@@ -505,7 +503,9 @@
     });
     // the voice says hello once the landing has settled
     if (voice) gsap.delayedCall(reduce ? 1 : 4.6, () => { if (mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.t("hello"), 6); } });
-    return { rain, day, wiping: () => wiping };
+    // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
+    if (voice && !/[?&]nobrain\b/.test(location.search)) voice.wake();
+    return { rain, day, voice, wiping: () => wiping };
   })();
 
   /* ---------------- the preview that follows the pointer over lists ---------------- */
@@ -801,7 +801,7 @@
   })();
 
   /* ---------------- home intro: the light comes up behind the glass, the rain starts, then the name ---------------- */
-  function intro() {
+  function intro(logoDone = false) {
     const shown = () => gsap.set("[data-intro]", { visibility: "visible" });
     const rain = hero.rain;
     if (reduce) { shown(); if (rain) rain.set("expo", 1); return; }
@@ -817,7 +817,7 @@
     }
     // the name is traced as a fine line, then fills from below like water rising behind it
     const trace = $(".hero__trace"), wave = $(".hero__wave");
-    if (trace && wave) {
+    if (trace && wave && !logoDone) {
       const len = trace.getTotalLength();
       gsap.set(trace, { opacity: 1, strokeDasharray: len, strokeDashoffset: len });
       gsap.set(wave, { attr: { transform: "translate(0 250)" } });
@@ -828,13 +828,58 @@
         .to(w, { x: -240, duration: 2.2 * k, ease: "none", onUpdate: put }, 1.9 * k)
         .to(trace, { opacity: 0, duration: 0.9, ease: "power1.out" }, 3.2 * k);
     }
+    const at = logoDone ? 0.9 : 2.9 * k;
     const split = SplitText.create(".hero__line", { type: "lines", mask: "lines" });
-    tl.from(split.lines, { yPercent: 110, duration: 1.3, ease: EO, stagger: 0.07 }, 2.9 * k)
-      .from(".hero__sky", { yPercent: 120, clipPath: "inset(0 0 100% 0)", duration: 1.1, ease: EO }, 2.85 * k)
-      .from(".bar__all", { yPercent: -140, duration: 1.2, ease: EO }, 3.1 * k)
-      .from(".vcard", { yPercent: 130, duration: 1.4, ease: EO }, 3.2 * k);
+    tl.from(split.lines, { yPercent: 110, duration: 1.3, ease: EO, stagger: 0.07 }, at)
+      .from(".hero__sky", { yPercent: 120, clipPath: "inset(0 0 100% 0)", duration: 1.1, ease: EO }, at - 0.05)
+      .from(".bar__all", { yPercent: -140, duration: 1.2, ease: EO }, at + 0.2)
+      .from(".vcard", { yPercent: 130, duration: 1.4, ease: EO }, at + 0.3);
     // whatever happens during the intro, it always ends complete
     tl.eventCallback("onInterrupt", () => tl.progress(1));
+  }
+
+  /* ---------------- loading: the logo fills with water as the window and the voice get ready ---------------- */
+  function load() {
+    const el = $("#loader");
+    if (!el) return Promise.resolve(false);
+    return new Promise((done) => {
+      const trace = $(".loader__trace", el), wave = $(".loader__wave", el), pct = $(".loader__pct", el), skip = $(".loader__skip", el);
+      const len = trace.getTotalLength();
+      gsap.set(trace, { opacity: 1, strokeDasharray: len, strokeDashoffset: reduce ? 0 : len });
+      if (!reduce) gsap.to(trace, { strokeDashoffset: 0, duration: 1.6, ease: "power2.inOut" });
+      const w = { x: 0, y: 250, shown: 0 }, t0 = performance.now();
+      const put = () => wave.setAttribute("transform", `translate(${w.x.toFixed(1)} ${w.y.toFixed(1)})`);
+      put();
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        gsap.ticker.remove(tick);
+        gsap.timeline({ onComplete: () => { el.remove(); done(true); } })
+          .to(w, { y: -40, duration: 0.5, ease: "power2.out", onUpdate: put })
+          .to(trace, { opacity: 0, duration: 0.6 }, 0.2)
+          .to(pct, { opacity: 0, duration: 0.4 }, 0)
+          .set("[data-intro]", { visibility: "visible" }, 0.55)
+          .to(el, { backgroundColor: "rgba(5, 6, 5, 0)", duration: reduce ? 0 : 1.4, ease: "power2.inOut" }, 0.55)
+          .set(el, { opacity: 0 });
+        if (hero.rain) gsap.to(hero.rain.state, { expo: 1, duration: 2.4, ease: "power2.out", delay: 0.4 });
+      };
+      skip.addEventListener("click", finish);
+      const tick = () => {
+        const now = performance.now(), v = hero.voice, b = v && v.brain;
+        const scene = hero.rain ? (hero.rain.ready ? 1 : 0) : 1;
+        const mind = !b || b.off || b.ready ? (b && !b.ready && !b.off && b.status === "checking" ? 0 : 1) : 0.05 + b.progress * 0.88;
+        // the water only ever rises, even when a new file starts and the raw percentage dips
+        const target = (w.peak = Math.max(w.peak || 0, Math.min(1, 0.12 * scene + 0.88 * mind)));
+        w.shown += (target - w.shown) * (reduce ? 1 : 0.05);
+        w.y = 250 - 290 * w.shown; w.x -= 0.6; put();
+        const n = Math.floor(w.shown * 100);
+        if (pct.textContent !== n + "%") { pct.textContent = n + "%"; el.setAttribute("aria-valuenow", n); }
+        if (now - t0 > 14000) skip.classList.add("is-on");
+        if (target >= 1 && w.shown > 0.985 && now - t0 > (reduce ? 300 : 1900)) finish();
+      };
+      gsap.ticker.add(tick);
+    });
   }
 
   if (/[?&]test\b/.test(location.search)) window.__pp = { Z, DAY, boards, cam, L, get mode() { return mode; }, get busy() { return busy; } };
@@ -859,7 +904,7 @@
     // pages split their lines only once the real faces are in
     if (r0.page !== "home") openPage(r0.page);
     fitAll();
-    if (r0.page === "home") intro(); else { gsap.set("[data-intro]", { visibility: "visible" }); if (hero.rain) hero.rain.set("expo", 1); }
+    if (r0.page === "home") load().then((filled) => intro(filled)); else { gsap.set("[data-intro]", { visibility: "visible" }); if (hero.rain) hero.rain.set("expo", 1); }
     if (r0.slug) openCase(r0.slug, false);
     ScrollTrigger.refresh();
   });
