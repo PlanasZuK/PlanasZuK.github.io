@@ -403,7 +403,7 @@
   for (const [id, b] of Object.entries(boards)) {
     const hit = $(".board__hit", b), name = b.dataset.soon || $(".board__label b", b).textContent;
     const still = () => busy || touch || Z.v < 0.999 || Z.tw;
-    hit.addEventListener("pointerenter", () => { if (!still()) { cursor.show(name); b._lift = true; hovered = b; if (window.Sound) Sound.cardEnter(); gsap.to(b, { scale: 1.03, z: 60, duration: 0.8, ease: "power3.out", overwrite: "auto" }); } });
+    hit.addEventListener("pointerenter", () => { if (!still()) { cursor.show(name); b._lift = true; hovered = b; if (window.Sound) Sound.cardEnter(id); gsap.to(b, { scale: 1.03, z: 60, duration: 0.8, ease: "power3.out", overwrite: "auto" }); } });
     hit.addEventListener("pointermove", (e) => {
       if (still()) return;
       b._lift = true;
