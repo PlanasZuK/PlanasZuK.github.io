@@ -487,7 +487,6 @@
         if (window.__pp) (window.__inks = window.__inks || []).push(input);
         if (!voice || !voice.deliberate(input)) return ignored();
         played = 0;
-        if (!noBrain && !voice.brain) (window.requestIdleCallback || setTimeout)(() => voice.wake(), { timeout: 4000 });
         voice.typing(20);
         handle(input);
       },
@@ -601,6 +600,9 @@
     });
     // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
     const noBrain = /[?&]nobrain\b/.test(location.search);
+    // the model wakes with the page, under the loading screen, so the voice is ready the moment you arrive;
+    // if someone skips ahead, the written lines answer until it is ready, without a word about it
+    if (voice && !noBrain) voice.wake();
     // a guard for any machine: if the model makes the window stutter for several seconds, it is let go,
     // and the written lines carry the conversation on
     let heavy = 0;

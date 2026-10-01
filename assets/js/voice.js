@@ -854,13 +854,11 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       // greetings and rudeness get a fresh answer from the model when it is awake; prices and pages stay exact
       if (key && !(["hi", "rude"].includes(key) && this.brain && this.brain.ready)) return this.reply(key, text);
       if (key === "hi") this.askedBiz = false;
-      if (!this.brain) await this.wake();
       const b = this.brain;
       if (b && b.ready) {
         const out = await this.ask(text);
         if (out) return this.maybeOffer(out);
       }
-      if (b && b.off && !this.toldOff) { this.toldOff = true; return { text: this.t(b.status.startsWith("error") ? "broken" : "nobrain") }; }
       const spare = theme(SPARE, c);
       if (spare) return this.reply(spare, text);
       return { text: count(c) > 3 ? this.t("unsure") : this.t("unknown", text) };
