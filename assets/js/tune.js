@@ -3,7 +3,7 @@
    set on the clipboard as JSON, ready to become the defaults in rain.js. */
 export async function tune(rain, sky) {
   const { GUI } = await import("https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm");
-  const KEY = "pp-rain-tune-2";
+  const KEY = "pp-rain-tune-3";
   const FOLDERS = { rain: "Pluja al vidre", glass: "Vidre i vapor", wind: "Vent i planta", camera: "Càmera", post: "Postprocessat" };
   const LABELS = {
     // pluja
@@ -14,7 +14,7 @@ export async function tune(rain, sky) {
     // vidre
     fog: "Vidre entelat", refog: "Rapidesa amb què torna el vapor", frostBlur: "Desenfocament del vapor", frostLift: "Blancor del vapor", frostGlow: "Llum que traspassa el vapor",
     frostDesat: "Pèrdua de color amb el vapor", micro: "Textura de micro-gotes", clearBlur: "Desenfocament amb el vidre net", refract: "Refracció de les gotes", rim: "Vora fosca de les gotes",
-    spec: "Reflex de les gotes", specSharp: "Nitidesa del reflex", wipe: "Mida del dit", grease: "Marca que deixa el dit",
+    spec: "Reflex de les gotes", specSharp: "Nitidesa del reflex", wipe: "Mida del dit (px)", grease: "Marca que deixa el dit",
     // vent
     wind: "Força general del vent", breeze: "Brisa constant", gustMin: "Ràfegues: temps mínim entre (s)", gustMax: "Ràfegues: temps màxim entre (s)", gust: "Força de les ràfegues",
     plant: "Moviment general de la planta", bend: "Flexió de la tija", swing: "Gronxat de les flors", flutter: "Tremolor de les flors", meadow: "Moviment del prat del fons",

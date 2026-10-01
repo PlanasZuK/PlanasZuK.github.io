@@ -189,9 +189,10 @@ html:not(.js) .board--home { order: -1; }
 .hero__sky { opacity: 0.62; min-height: 1.35em; }
 .js:not(.reduced) [data-intro] { visibility: hidden; }
 /* the fingertip on the glass */
-.touch { position: fixed; left: 0; top: 0; z-index: 94; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 1px solid rgba(242, 243, 236, 0.55); pointer-events: none; opacity: 0; scale: 0.6; transition: opacity 0.4s, scale 0.6s var(--ease); }
-.touch.is-on { opacity: 1; scale: 1; }
-.touch.is-down { scale: 0.62; background: rgba(242, 243, 236, 0.12); border-color: rgba(242, 243, 236, 0.9); }
+.touch { position: fixed; left: 0; top: 0; z-index: 94; width: 28px; height: 28px; margin: -14px 0 0 -14px; pointer-events: none; }
+.touch__ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(242, 243, 236, 0.55); opacity: 0; scale: 0.6; transition: opacity 0.4s, scale 0.6s var(--ease), background-color 0.3s, border-color 0.3s; }
+.touch.is-on .touch__ring { opacity: 1; scale: 1; }
+.touch.is-down .touch__ring { background: rgba(242, 243, 236, 0.1); border-color: rgba(242, 243, 236, 0.9); }
 @media (pointer: coarse) { .touch { display: none; } .hero__rain { cursor: auto; } }
 
 /* ---------- work: only the work ---------- */

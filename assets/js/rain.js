@@ -17,9 +17,9 @@
       fadeIn: [1.6, 0.3, 8, 0.1], windPush: [14, 0, 60, 1], cap: [520, 100, 2000, 10], size: [1, 0.4, 2.5, 0.05],
     },
     glass: {
-      fog: [1, 0, 1, 0.01], refog: [0.166, 0, 0.2, 0.002], frostBlur: [4.7, 0, 7, 0.1], frostLift: [0.06, 0, 0.3, 0.005], frostGlow: [0.1, 0, 0.4, 0.005],
+      fog: [1, 0, 1, 0.01], refog: [0.06, 0, 0.2, 0.002], frostBlur: [4.7, 0, 7, 0.1], frostLift: [0.06, 0, 0.3, 0.005], frostGlow: [0.1, 0, 0.4, 0.005],
       frostDesat: [0.3, 0, 1, 0.01], micro: [0.022, 0, 0.1, 0.002], clearBlur: [0.65, 0, 4, 0.05], refract: [0.2, 0, 0.6, 0.01], rim: [0.22, 0, 1, 0.01],
-      spec: [1.5, 0, 4, 0.05], specSharp: [50, 5, 300, 1], wipe: [0.02, 0.01, 0.15, 0.002], grease: [0.2, 0, 1, 0.01],
+      spec: [1.5, 0, 4, 0.05], specSharp: [50, 5, 300, 1], wipe: [14, 6, 40, 1], grease: [0.2, 0, 1, 0.01],
     },
     wind: {
       breeze: [0.55, 0, 2, 0.01], gustMin: [9, 2, 60, 1], gustMax: [24, 3, 90, 1], gust: [1, 0, 3, 0.05], bend: [0.05, 0, 0.2, 0.001],
@@ -197,7 +197,7 @@ void main() {
   class Rain {
     constructor(canvas, o = {}) {
       this.c = canvas;
-      this.o = Object.assign({ img: "", mask: "", water: 0.75, fogScale: 0.3, dpr: 1.5, reduce: false }, o);
+      this.o = Object.assign({ img: "", mask: "", water: 0.75, fogScale: 0.5, dpr: 1.5, reduce: false }, o);
       this.P = Object.assign({}, DEFAULTS, o.params || {});
       const gl = canvas.getContext("webgl2", { antialias: false, alpha: false });
       if (!gl) { this.dead = true; return; }
@@ -369,9 +369,11 @@ void main() {
       const r = this.c.getBoundingClientRect(), x = (cx - r.left) / r.width, y = (cy - r.top) / r.height;
       return any || (x >= 0 && x <= 1 && y >= 0 && y <= 1) ? { x, y } : null;
     }
-    wipe(x0, y0, x1, y1, grow = 0) {
+    // the fingertip's radius in CSS pixels: the ring on screen is drawn at exactly this size
+    fingerRadius() { return this.P.wipe; }
+    wipe(x0, y0, x1, y1) {
       const f = this.fx, g = this.gx, fw = this.fog.width, fh = this.fog.height;
-      const rad = Math.max(20, Math.min(this.W, this.H) * (this.P.wipe + grow)) * this.o.fogScale;
+      const rad = this.fingerRadius() * this.o.fogScale;
       const dx = (x1 - x0) * fw, dy = (y1 - y0) * fh, len = Math.hypot(dx, dy);
       const steps = Math.max(1, Math.ceil(len / (rad * 0.25)));
       const nx = len ? -dy / len : 0, ny = len ? dx / len : 0;
@@ -379,8 +381,8 @@ void main() {
       this.buildGrid();
       for (let i = 1; i <= steps; i++) {
         const x = x0 * fw + (dx * i) / steps, y = y0 * fh + (dy * i) / steps;
-        const gr = f.createRadialGradient(x, y, rad * 0.2, x, y, rad);
-        gr.addColorStop(0, "rgba(0,0,0,0.92)"); gr.addColorStop(0.7, "rgba(0,0,0,0.72)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+        const gr = f.createRadialGradient(x, y, 0, x, y, rad);
+        gr.addColorStop(0, "rgba(0,0,0,0.96)"); gr.addColorStop(0.86, "rgba(0,0,0,0.92)"); gr.addColorStop(1, "rgba(0,0,0,0)");
         f.fillStyle = gr; f.fillRect(x - rad, y - rad, rad * 2, rad * 2);
         g.fillStyle = "rgba(255,255,255,0.03)"; g.beginPath(); g.arc(x, y, rad * 0.75, 0, 6.283); g.fill();
         const wx = x * ws, wy = y * ws, wr = rad * ws * 0.9;
@@ -501,11 +503,7 @@ void main() {
         fx.save(); fx.globalAlpha = P.refog * (1 - s.sun); fx.fillStyle = this.pattern; fx.fillRect(0, 0, this.fog.width, this.fog.height); fx.restore();
         if (s.sun > 0.01) { fx.fillStyle = `rgba(0,0,0,${0.08 * s.sun})`; fx.fillRect(0, 0, this.fog.width, this.fog.height); }
       }
-      if (this.finger && !pre) {
-        const f = this.finger;
-        f.still += dt;
-        if (f.still > 0.4) this.wipe(f.x, f.y, f.x, f.y, Math.min(0.08, (f.still - 0.4) * 0.025));
-      }
+
     }
     draw() {
       const x = this.wx, W = this.water.width, H = this.water.height, P = this.P;

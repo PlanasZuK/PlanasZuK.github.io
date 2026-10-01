@@ -92,6 +92,7 @@
       boards[id]._f = f;
       gsap.set(boards[id], { x: dx * L.W * 0.4 * f, y: dy * L.H * 0.4 * f, rotationY: -dx * 24 * f, rotationX: dy * 20 * f });
     }
+    if (e < 0.999) settleLifts();
     const m = mode === "page" ? "page" : e > 0.001 ? "overview" : "focus";
     if (m !== mode) setMode(m);
     html.classList.toggle("is-zooming", e > 0.001 && e < 0.999);
@@ -173,10 +174,17 @@
     if (v && v.scrollTop) gsap.to(v, { scrollTop: 0, duration: reduce ? 0 : 1.1, ease: "power3.inOut" });
   }
   function arrive(id, push = true, slug = null) {
+    Z.v = Z.t = 0; Z.center = id;
+    settleLifts();
+    for (const b of Object.values(boards)) { b._f = undefined; gsap.set(b, { clearProps: "transform" }); }
+    render();
     setRoute(id);
     if (id === "home") { mode = "focus"; setMode("focus"); } else openPage(id);
     if (push && location.pathname !== pathOf(id, slug)) history.pushState({}, "", pathOf(id, slug));
     if (slug) openCase(slug, false);
+  }
+  function settleLifts() {
+    for (const b of Object.values(boards)) if (b._lift) { b._lift = false; gsap.killTweensOf(b, "scale,z,rotationX,rotationY"); gsap.set(b, { scale: 1, z: 0, rotationX: 0, rotationY: 0 }); }
   }
   function unlift() {
     Object.values(boards).filter((b) => gsap.getProperty(b, "scale") !== 1).forEach((b) => gsap.to(b, { scale: 1, z: 0, rotationX: 0, rotationY: 0, x: 0, y: 0, duration: 0.6, ease: "power3.out", overwrite: true }));
@@ -186,6 +194,10 @@
     if (busy) return;
     if (target === "overview" && mode === "overview") target = current;
     busy = true;
+    try { await fly(target, push, slug); }
+    finally { html.classList.remove("is-flying"); busy = false; }
+  }
+  async function fly(target, push, slug) {
     cursor.hide();
     html.classList.remove("bar-hidden");
     if (caseOpen) closeCase(false);
@@ -217,8 +229,6 @@
       await zto(0, chained ? 1.05 : 1.1, chained ? "power3.out" : "power3.inOut");
       arrive(target, push, slug);
     }
-    html.classList.remove("is-flying");
-    busy = false;
   }
 
   /* ---------------- the pull: wheel and touch move the camera directly ---------------- */
@@ -244,10 +254,13 @@
       u = Math.max(0, Math.min(2, u));
       DAY.t = Math.min(1, u);
       Z.t = Math.max(0, u - 1);
+      if (Z.t < 0.002) Z.t = 0; else if (Z.t > 0.998) Z.t = 1;
+      if (DAY.t < 0.001) DAY.t = 0; else if (DAY.t > 0.999) DAY.t = 1;
       return;
     }
     const prev = Z.t;
     Z.t = clamp(Z.t - dy / L.ZR);
+    if (Z.t < 0.002) Z.t = 0; else if (Z.t > 0.998) Z.t = 1;
     if (reduce && Z.t !== prev) Z.t = Z.t > prev ? 1 : 0;
   }
   // the camera follows the pull with a little inertia; when it rests at either end, it arrives
@@ -351,9 +364,10 @@
   for (const [id, b] of Object.entries(boards)) {
     const hit = $(".board__hit", b), name = b.dataset.soon || $(".board__label b", b).textContent;
     const still = () => busy || touch || Z.v < 0.999 || Z.tw;
-    hit.addEventListener("pointerenter", () => { if (!still()) { cursor.show(name); gsap.to(b, { scale: 1.03, z: 60, duration: 0.8, ease: "power3.out", overwrite: "auto" }); } });
+    hit.addEventListener("pointerenter", () => { if (!still()) { cursor.show(name); b._lift = true; gsap.to(b, { scale: 1.03, z: 60, duration: 0.8, ease: "power3.out", overwrite: "auto" }); } });
     hit.addEventListener("pointermove", (e) => {
       if (still()) return;
+      b._lift = true;
       const r = hit.getBoundingClientRect();
       gsap.to(b, { rotationX: ((e.clientY - r.top) / r.height - 0.5) * -6, rotationY: ((e.clientX - r.left) / r.width - 0.5) * 8, duration: 0.8, ease: "power3.out", overwrite: "auto" });
     });
@@ -368,17 +382,55 @@
     const live = () => mode !== "page" && !busy;
     const tx = gsap.quickTo(tip, "x", { duration: 0.2, ease: "power3" }), ty = gsap.quickTo(tip, "y", { duration: 0.2, ease: "power3" });
     // a mouse: press and drag to wipe the glass
+    // what people write on the glass is read, and can take them somewhere
+    let holdLabel = 0;
+    const vEl = $(".voice"), voice = window.Voice && vEl ? new Voice(vEl, { lang: LANG, locked: ["work", "about", "services", "contact"].filter(isLocked) }) : null;
+    const vx = vEl ? gsap.quickTo(vEl, "x", { duration: 0.35, ease: "power3" }) : () => {}, vy = vEl ? gsap.quickTo(vEl, "y", { duration: 0.35, ease: "power3" }) : () => {};
+    if (vEl) gsap.set(vEl, { x: innerWidth * 0.5 - 120, y: innerHeight * 0.62 });
+    const sections = ["work", "about", "services", "contact"];
+    const take = (target, line) => {
+      if (isLocked(target)) { voice.say(voice.t("soon")); return; }
+      voice.say(line || voice.t(target), 2.4);
+      gsap.delayedCall(2.4, () => { if (mode === "focus" && !busy) go(target); });
+    };
+    const ink = window.Ink ? new Ink({ lang: LANG,
+      onReading: () => voice && voice.say(voice.t("reading"), 8),
+      onWord: (target) => {
+        if (mode !== "focus" || busy || !voice) return;
+        if (sections.includes(target)) return take(target);
+        if (target === "sun") { voice.say(voice.t("sun")); gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 4, ease: "sine.inOut" }, "+=9"); return; }
+        if (target === "rain") { voice.say(voice.t("rain")); gsap.timeline().to(rain.state, { storm: 1, duration: 2, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 5, ease: "sine.inOut" }, "+=10"); return; }
+        voice.say(voice.t(target) || voice.t("hi"));
+      },
+      onRead: async (cands) => {
+        if (mode !== "focus" || busy || !voice) return;
+        if (!cands.length) { voice.say(voice.t("blank")); return; }
+        const a = await voice.answer(cands[0]);
+        if (a && a.text) { if (a.go) take(a.go, a.text); else voice.say(a.text, 4.5); }
+        else voice.say(voice.t("unknown", cands[0]), 4);
+      },
+    }) : null;
+    let fresh = true;
+    try { fresh = !sessionStorage.getItem("pp-wiped"); } catch (e) {}
     el.addEventListener("pointerdown", (e) => {
       if (e.pointerType !== "mouse" || e.button || !live() || mode !== "focus") return;
-      if (rain.down(e.clientX, e.clientY)) tip.classList.add("is-down");
+      if (rain.down(e.clientX, e.clientY)) {
+        tip.classList.add("is-down");
+        if (ink) ink.down(e.clientX, e.clientY);
+        if (fresh) { fresh = false; if (voice) voice.hush(); try { sessionStorage.setItem("pp-wiped", "1"); } catch (x) {} }
+      }
     });
     addEventListener("pointermove", (e) => {
       if (e.pointerType !== "mouse" || !live()) return;
       rain.move(e.clientX, e.clientY);
+      if (ink && rain.finger) ink.move(e.clientX, e.clientY);
       tip.classList.toggle("is-on", mode === "focus" && !!e.target.closest(".hero"));
+      const d = Math.round(rain.fingerRadius() * 2);
+      if (tip._d !== d) { tip._d = d; Object.assign(tip.style, { width: d + "px", height: d + "px", margin: `${-d / 2}px 0 0 ${-d / 2}px` }); }
       tx(e.clientX); ty(e.clientY);
+      vx(Math.min(e.clientX + (tip._d || 40) / 2 + 14, innerWidth - 300)); vy(e.clientY - 9);
     }, { passive: true });
-    addEventListener("pointerup", () => { rain.up(); tip.classList.remove("is-down"); });
+    addEventListener("pointerup", () => { if (rain.finger && ink) ink.up(); rain.up(); tip.classList.remove("is-down"); });
     el.addEventListener("pointerleave", () => { rain.up(); tip.classList.remove("is-on", "is-down"); });
     // a finger: rest it on the glass for a moment, then drag; a quick flick still scrolls
     let hold = null, wiping = false;
@@ -386,10 +438,10 @@
       if (!live() || mode !== "focus") return;
       const t0 = e.touches[0];
       clearTimeout(hold);
-      hold = setTimeout(() => { wiping = rain.down(t0.clientX, t0.clientY); }, 170);
+      hold = setTimeout(() => { wiping = rain.down(t0.clientX, t0.clientY); if (wiping && ink) ink.down(t0.clientX, t0.clientY); }, 170);
     }, { passive: true });
-    el.addEventListener("touchmove", (e) => { const t0 = e.touches[0]; if (wiping) rain.move(t0.clientX, t0.clientY); else clearTimeout(hold); }, { passive: true });
-    el.addEventListener("touchend", () => { clearTimeout(hold); wiping = false; rain.up(); }, { passive: true });
+    el.addEventListener("touchmove", (e) => { const t0 = e.touches[0]; if (wiping) { rain.move(t0.clientX, t0.clientY); if (ink) ink.move(t0.clientX, t0.clientY); } else clearTimeout(hold); }, { passive: true });
+    el.addEventListener("touchend", () => { clearTimeout(hold); if (wiping && ink) ink.up(); wiping = false; rain.up(); }, { passive: true });
     // the light: afternoon when you arrive; scrolling brings the sunset, then the night
     const label = $(".hero__sky"), words = label ? JSON.parse(label.dataset.labels) : {};
     // six moments of light, from a cool 7 a.m. to midnight, blended smoothly as you scroll
@@ -412,6 +464,7 @@
       rain.state.night = lerp(A.night, B.night, t);
       if (!label) return;
       const min = Math.round((A.h + (B.h - A.h) * u) * 60) % 1440, hh = Math.floor(min / 60), text = `${String(hh).padStart(2, "0")}:${String(min % 60).padStart(2, "0")} · ${rain.state.storm > 0.5 ? words.storm : hh < 10 && hh >= 5 ? words.morning : hh < 14 && hh >= 5 ? words.noon : hh < 18 && hh >= 5 ? words.afternoon : hh < 20 && hh >= 5 ? words.sunset : hh < 22 && hh >= 5 ? words.evening : words.night}`;
+      if (performance.now() < holdLabel) { lastLabel = ""; return; }
       if (text !== lastLabel) { label.textContent = text; lastLabel = text; }
     };
     day(0);
@@ -428,7 +481,7 @@
     gsap.delayedCall(5, strike);
     // ?tune opens the live settings panel
     if (q.has("tune")) {
-      try { const st = JSON.parse(localStorage.getItem("pp-rain-tune-2") || "null"); if (st) Object.assign(rain.P, st); } catch (e) {}
+      try { const st = JSON.parse(localStorage.getItem("pp-rain-tune-3") || "null"); if (st) Object.assign(rain.P, st); } catch (e) {}
       import("/assets/js/tune.js").then((m) => m.tune(rain, (mode) => {
         const at = typeof mode === "number" ? mode : { dawn: 0, day: 0.2, dusk: 0.62, night: 1 }[mode];
         if (at !== undefined) { DAY.t = DAY.v = at; }
@@ -447,6 +500,8 @@
         gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 4, ease: "sine.inOut" }, "+=9");
       }
     });
+    // the voice says hello once the landing has settled
+    if (voice && fresh) gsap.delayedCall(reduce ? 1 : 4.6, () => { if (mode === "focus" && fresh) voice.say(voice.t("hello"), 6); });
     return { rain, day, wiping: () => wiping };
   })();
 
@@ -757,12 +812,29 @@
       tl.to(rain.state, { expo: 1, duration: 2.6 * k, ease: "power2.out" }, 0)
         .to(rain.state, { rain: 1, duration: 3, ease: "sine.in" }, 0.4 * k);
     }
-    tl.fromTo(".hero__logo", { clipPath: "inset(0% 0% 100% 0%)", yPercent: 30 }, { clipPath: "inset(0% 0% 0% 0%)", yPercent: 0, duration: 1.6 * k, ease: EO }, 1.0 * k);
+    // the name is traced as a fine line, then fills from below like water rising behind it
+    const trace = $(".hero__trace"), wave = $(".hero__wave");
+    if (trace && wave) {
+      const len = trace.getTotalLength();
+      gsap.set(trace, { opacity: 1, strokeDasharray: len, strokeDashoffset: len });
+      gsap.set(wave, { attr: { transform: "translate(0 250)" } });
+      const w = { x: 0, y: 250 };
+      const put = () => wave.setAttribute("transform", `translate(${w.x.toFixed(1)} ${w.y.toFixed(1)})`);
+      tl.to(trace, { strokeDashoffset: 0, duration: 2.1 * k, ease: "power2.inOut" }, 0.8 * k)
+        .to(w, { y: -40, duration: 1.7 * k, ease: "power3.inOut", onUpdate: put }, 1.9 * k)
+        .to(w, { x: -240, duration: 2.2 * k, ease: "none", onUpdate: put }, 1.9 * k)
+        .to(trace, { opacity: 0, duration: 0.9, ease: "power1.out" }, 3.2 * k);
+    }
     const split = SplitText.create(".hero__line", { type: "lines", mask: "lines" });
-    tl.from(split.lines, { yPercent: 110, duration: 1.3, ease: EO, stagger: 0.07 }, 1.35 * k)
-      .from(".bar__all", { yPercent: -140, duration: 1.2, ease: EO }, 1.5 * k)
-      .from(".vcard", { yPercent: 130, duration: 1.4, ease: EO }, 1.6 * k);
+    tl.from(split.lines, { yPercent: 110, duration: 1.3, ease: EO, stagger: 0.07 }, 2.9 * k)
+      .from(".hero__sky", { yPercent: 120, clipPath: "inset(0 0 100% 0)", duration: 1.1, ease: EO }, 2.85 * k)
+      .from(".bar__all", { yPercent: -140, duration: 1.2, ease: EO }, 3.1 * k)
+      .from(".vcard", { yPercent: 130, duration: 1.4, ease: EO }, 3.2 * k);
+    // whatever happens during the intro, it always ends complete
+    tl.eventCallback("onInterrupt", () => tl.progress(1));
   }
+
+  if (/[?&]test\b/.test(location.search)) window.__pp = { Z, DAY, boards, cam, L, get mode() { return mode; }, get busy() { return busy; } };
 
   /* ---------------- start ---------------- */
   layout();
