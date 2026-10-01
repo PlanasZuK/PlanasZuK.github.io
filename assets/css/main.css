@@ -539,3 +539,15 @@ html:not([data-mode="focus"]) .voice { opacity: 0; }
 .bar__end { display: flex; align-items: center; gap: 18px; }
 .bar__sound { height: 36px; padding: 0 2px; font: 500 11.5px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; color: inherit; background: none; border: 0; cursor: pointer; }
 @media (max-width: 899px) { .bar__end { gap: 12px; } }
+
+/* the overview floats in a very dark, slowly drifting space: no stars, just depth */
+.space { display: none; }
+.js .space { position: fixed; inset: 0; z-index: 0; display: block; overflow: hidden; pointer-events: none; background: #060606; }
+.js .canvas { background: transparent; }
+.space i { opacity: var(--zk, 0); }
+.space i { position: absolute; width: 120vmax; height: 120vmax; border-radius: 50%; filter: blur(60px); will-change: transform; }
+.space i:nth-child(1) { left: -40vmax; top: -50vmax; background: radial-gradient(closest-side, rgba(52, 62, 92, 0.32), rgba(52, 62, 92, 0) 70%); animation: drift-a 70s ease-in-out infinite alternate; }
+.space i:nth-child(2) { right: -50vmax; bottom: -55vmax; background: radial-gradient(closest-side, rgba(70, 52, 84, 0.24), rgba(70, 52, 84, 0) 70%); animation: drift-b 90s ease-in-out infinite alternate; }
+@keyframes drift-a { to { transform: translate3d(18vmax, 14vmax, 0) scale(1.15); } }
+@keyframes drift-b { to { transform: translate3d(-16vmax, -12vmax, 0) scale(1.1); } }
+html.reduced .space i { animation: none; }

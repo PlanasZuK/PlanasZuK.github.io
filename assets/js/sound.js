@@ -16,9 +16,9 @@
   const BASE = "/assets/sound/";
   const lerp = (a, b, t) => a + (b - a) * t, clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const S = {
-    on: false, want: false, ctx: null, last: 0, buf: {}, sprites: null, st: { rain: 1, wind: 0, gust: 0, night: 0, storm: 0, hour: 7, muffle: 0, finger: 0, fx: 0 },
+    on: false, want: false, ctx: null, last: 0, buf: {}, sprites: null, st: { rain: 1, wind: 0, gust: 0, night: 0, storm: 0, hour: 7, zoom: 0, page: 0, muffle: 0, finger: 0, fx: 0 },
     // the mix, layer by layer (?tune shows a slider for each)
-    mix: { master: 0.34, outside: 1, glass: 0.55, drops: 0.5, thunder: 0.85, life: 1, finger: 0.8, fingerV: 2, voice: 1, room: 0.2 },
+    mix: { master: 0.34, outside: 1, glass: 0.55, drops: 0.5, thunder: 0.85, life: 1, space: 1, finger: 0.8, fingerV: 2, voice: 1, room: 0.2 },
     pref() { try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; } },
     save(v) { try { localStorage.setItem(KEY, v ? "1" : "0"); } catch (e) {} },
     // Opus where the browser decodes it, AAC otherwise
@@ -48,6 +48,7 @@
       const comp = ctx.createDynamicsCompressor();
       comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 2; comp.attack.value = 0.03; comp.release.value = 0.6;
       comp.connect(this.master).connect(ctx.destination);
+      this.comp = comp;
       this.pane = ctx.createBiquadFilter(); this.pane.type = "lowpass"; this.pane.Q.value = 0.5; this.pane.frequency.value = 16000;
       this.outside = g(this.mix.outside); this.duck = g(1);
       this.outside.connect(this.duck).connect(this.pane).connect(comp);
@@ -125,6 +126,7 @@
         this.apply(true);
       }
       try { this.sprites = await (await fetch(BASE + "sprites.json")).json(); } catch (e) {}
+      this.spaceBuild(); this.cardBuild(); this.apply(true);
     },
     // turned on and off by the visitor; it fades, never cuts
     async set(v) {
@@ -175,6 +177,7 @@
       Object.assign(this.st, st);
       this.apply();
       this.blackbird(now);
+      this.spaceGlint(now);
     },
     apply(first) {
       if (!this.ctx) return;
@@ -209,6 +212,9 @@
       set("crickets", nightW * hush * clamp(1.3 - r) * 0.8);
       this.duskW = ss(18, 19.2, h) * (1 - ss(20.8, 21.8, h)) * hush + dawn * 0.25 * hush;
       this.life.gain.setTargetAtTime(this.mix.life * lerp(1, 0.4, m), t, 0.3);
+      // the overview: space comes in as the window goes far away (and stays faint behind a page)
+      this.spaceLevel = ss(0.12, 0.9, s.zoom || 0) * (s.page ? 0.25 : 1);
+      if (this.sp) this.sp.out.gain.setTargetAtTime(this.spaceLevel * this.mix.space * 0.5, t, 0.6);
     },
     // a blackbird at dusk: a phrase now and then, somewhere out there, never twice in the same place
     blackbird(now) {
@@ -234,6 +240,125 @@
     },
     touch(down, x) { if (this.on && this.fingerNode) this.fingerNode.port.postMessage(down ? { down: 1, x } : { up: 1 }); },
     wet(size) { if (this.on && this.fingerNode) this.fingerNode.port.postMessage({ wet: size }); },
+    // ---------- the overview: a quiet room in space ----------
+    // When the camera pulls back from the window, the rain goes far away and this comes in: a slow, warm chord that
+    // breathes (three soft voices, each swelling on its own long cycle), a dark cosmic wind (noise through a band
+    // that drifts), and now and then a faint glint high up, all inside a long, dark reverb. Generated, never looped.
+    spaceBuild() {
+      if (this.sp) return this.sp;
+      const ctx = this.ctx, g = (v = 0) => { const n = ctx.createGain(); n.gain.value = v; return n; };
+      const out = g(0), dry = g(0.55), wet = g(0.9);
+      // a long, dark hall: seven seconds of decaying, darkening noise
+      const sr = ctx.sampleRate, len = Math.round(sr * 7), ir = ctx.createBuffer(2, len, sr);
+      for (let c = 0; c < 2; c++) {
+        const d = ir.getChannelData(c);
+        let lp = 0;
+        for (let i = 0; i < len; i++) { const t = i / sr, k = 0.08 + 0.5 * Math.exp(-t * 0.9); lp += (Math.random() * 2 - 1 - lp) * k; d[i] = lp * Math.exp(-t * 0.75) * clamp(t / 0.08); }
+      }
+      const hall = ctx.createConvolver(); hall.buffer = ir;
+      const tone = ctx.createBiquadFilter(); tone.type = "lowpass"; tone.frequency.value = 2400; tone.Q.value = 0.5;
+      const bus = g(1);
+      bus.connect(dry).connect(tone); bus.connect(hall).connect(wet).connect(tone);
+      tone.connect(out).connect(this.comp);
+      // the chord: D, A, D, F#, each voice a pair of slightly detuned sines that beat slowly against each other
+      const voices = [73.42, 110, 146.83, 185].map((f, i) => {
+        const a = ctx.createOscillator(), b = ctx.createOscillator(), vg = g(0), lfo = ctx.createOscillator(), lg = g(0.5), off = ctx.createConstantSource();
+        a.frequency.value = f; b.frequency.value = f * 1.0021; a.type = b.type = "sine";
+        lfo.frequency.value = 0.021 + i * 0.013 + Math.random() * 0.01; off.offset.value = 0.5;
+        lfo.connect(lg).connect(vg.gain); off.connect(vg.gain);
+        const pan = ctx.createStereoPanner(); pan.pan.value = [-0.5, 0.4, -0.2, 0.55][i];
+        a.connect(vg); b.connect(vg); vg.connect(pan).connect(g([0.05, 0.04, 0.026, 0.016][i])).connect(bus);
+        [a, b, lfo, off].forEach((o) => o.start());
+        return vg;
+      });
+      // the cosmic wind: soft noise through a slowly wandering band
+      const nb = ctx.createBuffer(2, sr * 3, sr);
+      for (let c = 0; c < 2; c++) { const d = nb.getChannelData(c); let p = 0; for (let i = 0; i < d.length; i++) { p = p * 0.97 + (Math.random() * 2 - 1) * 0.03; d[i] = p * 6; } }
+      const ns = ctx.createBufferSource(); ns.buffer = nb; ns.loop = true;
+      const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = 420; band.Q.value = 1.3;
+      const sweep = ctx.createOscillator(), sweepG = g(180); sweep.frequency.value = 0.017; sweep.connect(sweepG).connect(band.frequency);
+      ns.connect(band).connect(g(0.05)).connect(bus); ns.start(); sweep.start();
+      return (this.sp = { out, bus, voices, next: 0 });
+    },
+    // now and then, a faint glint: a high, soft partial of the chord that blooms and fades in the hall
+    spaceGlint(now) {
+      const S = this.sp; if (!S || now < S.next) return;
+      S.next = now + 3500 + Math.random() * 6500;
+      if (this.spaceLevel < 0.3) return;
+      const ctx = this.ctx, t = ctx.currentTime, f = [587.33, 880, 1174.66, 1318.5, 1480][(Math.random() * 5) | 0] * (Math.random() < 0.5 ? 1 : 0.5);
+      const o = ctx.createOscillator(), e = ctx.createGain(), pan = ctx.createStereoPanner();
+      o.type = "sine"; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 8;
+      e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(0.012 + Math.random() * 0.01, t + 1.6 + Math.random()); e.gain.setTargetAtTime(0, t + 2.8, 1.6);
+      pan.pan.value = Math.random() * 1.6 - 0.8;
+      o.connect(e).connect(pan).connect(S.bus); o.start(t); o.stop(t + 12);
+    },
+    // ---------- a card floating in zero gravity ----------
+    // While the pointer turns a card, it sounds like an object drifting in space: a soft breath of air whose colour
+    // and level follow how fast it turns, and a low, round hum that bends a little with the motion (a hint of
+    // Doppler), placed in 3D where the card is. It rises gently when the card lifts and settles when it lets go.
+    cardBuild() {
+      if (this.cd) return this.cd;
+      const ctx = this.ctx, g = (v = 0) => { const n = ctx.createGain(); n.gain.value = v; return n; };
+      const p = ctx.createPanner(); p.panningModel = "HRTF"; p.distanceModel = "inverse"; p.refDistance = 1; p.rolloffFactor = 0.5;
+      const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), d = nb.getChannelData(0);
+      let q = 0; for (let i = 0; i < d.length; i++) { q = q * 0.8 + (Math.random() * 2 - 1) * 0.2; d[i] = q * 2.5; }
+      const ns = ctx.createBufferSource(); ns.buffer = nb; ns.loop = true;
+      const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = 500; band.Q.value = 1.6;
+      const air = g(0); ns.connect(band).connect(air).connect(p);
+      const hum = ctx.createOscillator(), hum2 = ctx.createOscillator(); hum.type = "sine"; hum2.type = "triangle"; hum.frequency.value = 196; hum2.frequency.value = 294;
+      const humG = g(0), lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900;
+      hum.connect(humG); hum2.connect(g(0.18)).connect(humG); humG.connect(lp).connect(p);
+      const out = g(1); p.connect(out).connect(this.comp);
+      if (this.sp) out.connect(this.sp.bus);
+      [ns, hum, hum2].forEach((o) => o.start());
+      return (this.cd = { p, air, band, hum, hum2, humG, w: 0 });
+    },
+    cardEnter() {
+      if (!this.on) return;
+      const C = this.cardBuild(), t = this.ctx.currentTime;
+      C.base = 175 + Math.random() * 45;
+      C.hum.frequency.cancelScheduledValues(t); C.hum.frequency.setValueAtTime(C.base * 0.94, t); C.hum.frequency.setTargetAtTime(C.base, t, 0.25);
+      C.hum2.frequency.setTargetAtTime(C.base * 1.5, t, 0.25);
+      C.humG.gain.cancelScheduledValues(t); C.humG.gain.setTargetAtTime(0.011 * this.mix.space, t, 0.18);
+      C.air.gain.setTargetAtTime(0.005 * this.mix.space, t, 0.15);
+      C.on = true;
+    },
+    cardMove(w, x, y, rx, ry) {
+      const C = this.cd; if (!this.on || !C || !C.on) return;
+      const t = this.ctx.currentTime, s = clamp(w / 40);
+      C.w += (s - C.w) * 0.25;
+      const px = clamp(x, -1, 1) * 1.4 + ry * 0.03, py = clamp(y, -1, 1) * 0.8 - rx * 0.03, pz = -1.2;
+      if (C.p.positionX) { C.p.positionX.setTargetAtTime(px, t, 0.05); C.p.positionY.setTargetAtTime(py, t, 0.05); C.p.positionZ.setTargetAtTime(pz, t, 0.05); } else C.p.setPosition(px, py, pz);
+      // the faster it turns, the brighter the air and the more the hum bends
+      C.band.frequency.setTargetAtTime(380 + 1600 * C.w, t, 0.05);
+      C.air.gain.setTargetAtTime((0.005 + 0.028 * Math.pow(C.w, 0.8)) * this.mix.space, t, 0.05);
+      C.hum.frequency.setTargetAtTime(C.base * (1 + (ry / 8) * 0.025 + C.w * 0.03), t, 0.08);
+      C.hum2.frequency.setTargetAtTime(C.base * 1.5 * (1 - (rx / 6) * 0.02), t, 0.08);
+      C.humG.gain.setTargetAtTime((0.011 + 0.01 * C.w) * this.mix.space, t, 0.08);
+    },
+    cardLeave() {
+      const C = this.cd; if (!C || !this.on) return;
+      const t = this.ctx.currentTime;
+      C.on = false;
+      // it settles: the hum sinks a little and fades, the air sighs out
+      C.hum.frequency.setTargetAtTime((C.base || 196) * 0.93, t, 0.3);
+      C.humG.gain.setTargetAtTime(0, t + 0.05, 0.28);
+      C.air.gain.setTargetAtTime(0.008 * this.mix.space, t, 0.05); C.air.gain.setTargetAtTime(0, t + 0.12, 0.25);
+    },
+    // a label writing itself in: soft keys, quicker than the voice's
+    typeKeys(n, dur) {
+      if (!this.on || !this.ctx) return;
+      const ctx = this.ctx, at = ctx.currentTime + 0.01;
+      if (!this.keyBuf) this.keys(" ", 0.01, at);
+      for (let i = 0; i < n; i++) {
+        if (Math.random() < 0.35) continue;
+        const s = ctx.createBufferSource(), gn = ctx.createGain();
+        s.buffer = this.keyBuf; s.playbackRate.value = 0.95 + Math.random() * 0.4;
+        gn.gain.value = 0.06 * this.mix.voice * (0.6 + Math.random() * 0.6);
+        s.connect(gn); gn.connect(this.comp); if (this.sp) gn.connect(this.sp.bus);
+        s.start(at + (i / n) * dur + Math.random() * 0.006);
+      }
+    },
     // a drop lands on the pane: some of them are heard, placed where they hit
     tap(x, size) {
       if (!this.on || !this.sprites || !this.buf.drops || this.st.muffle > 0.5) return;

@@ -84,6 +84,7 @@
     cam.y = -c._y + (L.ov.y + c._y) * e;
     world.style.transform = `translate3d(${cam.x.toFixed(2)}px,${cam.y.toFixed(2)}px,0) scale(${cam.s.toFixed(5)})`;
     world.style.setProperty("--k", e.toFixed(3));
+    html.style.setProperty("--zk", e.toFixed(3));
     world.style.setProperty("--kg", sstep(0.3, 0.75, e).toFixed(3));
     const [cc, cr] = GRID[Z.center];
     // the other pages dock into place as the camera pulls back
@@ -373,23 +374,43 @@
   }
 
   /* ---------------- cursor label and board lift (overview) ---------------- */
+  let hovered = null;
+  // every frame, how the hovered card is turning: its sound floats with it
+  gsap.ticker.add(() => {
+    if (!hovered || !window.Sound || !Sound.on) return;
+    const rx = gsap.getProperty(hovered, "rotationX"), ry = gsap.getProperty(hovered, "rotationY"), r = hovered.getBoundingClientRect();
+    const now = performance.now(), dt = Math.max(0.008, (now - (hovered._t || now - 16)) / 1000);
+    const w = Math.hypot(rx - (hovered._rx || rx), ry - (hovered._ry || ry)) / dt;
+    hovered._rx = rx; hovered._ry = ry; hovered._t = now;
+    Sound.cardMove(w, ((r.left + r.width / 2) / innerWidth) * 2 - 1, 1 - ((r.top + r.height / 2) / innerHeight) * 2, rx, ry);
+  });
   const cursor = (() => {
     const el = $(".cursor"), label = $(".cursor__label");
     const x = gsap.quickTo(el, "x", { duration: 0.45, ease: "power3" }), y = gsap.quickTo(el, "y", { duration: 0.45, ease: "power3" });
     addEventListener("pointermove", (e) => { x(e.clientX); y(e.clientY); }, { passive: true });
-    return { show: (t) => { label.textContent = t; el.classList.add("is-on"); }, hide: () => el.classList.remove("is-on") };
+    let typer = null;
+    // the label writes itself in, quickly, like the voice does (with its soft keys when the sound is on)
+    const show = (t) => {
+      if (typer) typer.kill();
+      el.classList.add("is-on");
+      if (reduce) { label.textContent = t; return; }
+      const o = { n: 0 };
+      typer = gsap.to(o, { n: t.length, duration: Math.min(0.42, 0.028 * t.length + 0.06), ease: "none", onUpdate: () => { label.textContent = t.slice(0, Math.ceil(o.n)) || "\u00a0"; } });
+      if (window.Sound) Sound.typeKeys(t.length, Math.min(0.42, 0.028 * t.length + 0.06));
+    };
+    return { show, hide: () => el.classList.remove("is-on") };
   })();
   for (const [id, b] of Object.entries(boards)) {
     const hit = $(".board__hit", b), name = b.dataset.soon || $(".board__label b", b).textContent;
     const still = () => busy || touch || Z.v < 0.999 || Z.tw;
-    hit.addEventListener("pointerenter", () => { if (!still()) { cursor.show(name); b._lift = true; gsap.to(b, { scale: 1.03, z: 60, duration: 0.8, ease: "power3.out", overwrite: "auto" }); } });
+    hit.addEventListener("pointerenter", () => { if (!still()) { cursor.show(name); b._lift = true; hovered = b; if (window.Sound) Sound.cardEnter(); gsap.to(b, { scale: 1.03, z: 60, duration: 0.8, ease: "power3.out", overwrite: "auto" }); } });
     hit.addEventListener("pointermove", (e) => {
       if (still()) return;
       b._lift = true;
       const r = hit.getBoundingClientRect();
       gsap.to(b, { rotationX: ((e.clientY - r.top) / r.height - 0.5) * -6, rotationY: ((e.clientX - r.left) / r.width - 0.5) * 8, duration: 0.8, ease: "power3.out", overwrite: "auto" });
     });
-    hit.addEventListener("pointerleave", () => { cursor.hide(); if (!busy && Z.v >= 0.999) gsap.to(b, { scale: 1, z: 0, rotationX: 0, rotationY: 0, duration: 0.8, ease: "power3.out", overwrite: "auto" }); });
+    hit.addEventListener("pointerleave", () => { cursor.hide(); if (hovered === b) { hovered = null; if (window.Sound) Sound.cardLeave(); } if (!busy && Z.v >= 0.999) gsap.to(b, { scale: 1, z: 0, rotationX: 0, rotationY: 0, duration: 0.8, ease: "power3.out", overwrite: "auto" }); });
   }
 
   /* ---------------- home: a window on a rainy day ---------------- */
@@ -979,7 +1000,7 @@
       const r = hero.rain, s = r.state;
       Sound.fingerMove(r.finger ? r.fspeed || 0 : 0, r.finger ? r.finger.x * 2 - 1 : 0, r.fturn || 0, now);
       if (r.fturn > 0.5) r.fturn = 0.49;
-      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, hour: hero.hour ? hero.hour() : 12, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0 }, now);
+      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, hour: hero.hour ? hero.hour() : 12, zoom: Z.v, page: mode === "page" ? 1 : 0, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0 }, now);
     }
   });
   const fontsReady = Promise.race([d.fonts ? d.fonts.ready : Promise.resolve(), new Promise((res) => setTimeout(res, 1600))]);
