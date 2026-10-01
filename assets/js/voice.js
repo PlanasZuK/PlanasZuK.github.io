@@ -275,6 +275,9 @@ octagon|an octagon|un octàgon|un octógono`.split("\n").map((r) => { const [k, 
       idle_night: ["Night. Just us and the rain now.", "It's late. The rain doesn't sleep, and apparently neither do you.", "At night every drop sounds closer. Listen."],
       idle_storm: ["That was a big one. All right over there?", "Storm outside, calm in here. Best of both worlds.", "I love a storm. From behind the glass, obviously."],
       idle_any: ["Still there? Write me anything: a word, a doodle, your name.", "I could watch the rain all day. Actually, I do.", "What brings you here today?"],
+      intro: ["Hi! I'm the little voice that lives in Pol's window. What's your name?", "Hello! How nice, a visitor. I'm the voice of this window. And you are?", "Hi there! I live behind this glass and talk to whoever writes on it. What's your name?"],
+      askName: ["What's your name?", "And what's your name?"],
+      met: (n) => pick([`Nice to meet you, ${n}! What brings you here today?`, `${n}, lovely name. So, what do you do?`, `Hello, ${n}! Welcome to the window. What brings you by?`]),
       askBiz: ["What does your business do? You can draw it if you like!", "So, what’s your business? Draw it, if words are too dry."],
       open: [(n) => `${cap(n)}!`, (n) => `${cap(n)}, right?`],
       pitch: {
@@ -346,6 +349,9 @@ octagon|an octagon|un octàgon|un octógono`.split("\n").map((r) => { const [k, 
       idle_night: ["Nit. Ara només som tu, jo i la pluja.", "És tard. La pluja no dorm, i pel que veig tu tampoc.", "De nit cada gota sona més a prop. Escolta."],
       idle_storm: ["Aquest ha estat fort. Tot bé per aquí?", "Tempesta a fora, calma a dins. El millor dels dos mons.", "M’encanten les tempestes. Des de darrere el vidre, és clar."],
       idle_any: ["Encara hi ets? Escriu-me el que vulguis: una paraula, un dibuix, el teu nom.", "Podria mirar ploure tot el dia. De fet, ho faig.", "Què et porta per aquí, avui?"],
+      intro: ["Hola! Soc la veueta que viu a la finestra d’en Pol. Com et dius?", "Hola! Quina il·lusió, una visita. Soc la veu d’aquesta finestra. I tu, com et dius?", "Ei, hola! Visc darrere d’aquest vidre i parlo amb qui hi escriu. Com et dius?"],
+      askName: ["Com et dius?", "I tu, com et dius?"],
+      met: (n) => pick([`Encantat, ${n}! Què et porta per aquí?`, `${n}, quin nom més bonic. I a què et dediques?`, `Hola, ${n}! Benvingut a la finestra. Què et porta per aquí?`]),
       askBiz: ["A què es dedica el teu negoci? Si vols, dibuixa-ho!", "I tu, a què et dediques? Si t’és més fàcil, dibuixa-ho."],
       open: [(n) => `${cap(n)}!`, (n) => `${cap(n)}, oi?`],
       pitch: {
@@ -417,6 +423,9 @@ octagon|an octagon|un octàgon|un octógono`.split("\n").map((r) => { const [k, 
       idle_night: ["Noche. Ahora solo estamos tú, yo y la lluvia.", "Es tarde. La lluvia no duerme y, por lo que veo, tú tampoco.", "De noche cada gota suena más cerca. Escucha."],
       idle_storm: ["Ese ha sido fuerte. ¿Todo bien por ahí?", "Tormenta fuera, calma dentro. Lo mejor de los dos mundos.", "Me encantan las tormentas. Desde detrás del cristal, claro."],
       idle_any: ["¿Sigues ahí? Escríbeme lo que quieras: una palabra, un dibujo, tu nombre.", "Podría mirar llover todo el día. De hecho, lo hago.", "¿Qué te trae por aquí hoy?"],
+      intro: ["¡Hola! Soy la vocecita que vive en la ventana de Pol. ¿Cómo te llamas?", "¡Hola! Qué ilusión, una visita. Soy la voz de esta ventana. ¿Y tú cómo te llamas?", "¡Ey, hola! Vivo detrás de este cristal y hablo con quien escribe en él. ¿Cómo te llamas?"],
+      askName: ["¿Cómo te llamas?", "¿Y tú cómo te llamas?"],
+      met: (n) => pick([`¡Encantado, ${n}! ¿Qué te trae por aquí?`, `${n}, qué nombre tan bonito. ¿Y a qué te dedicas?`, `¡Hola, ${n}! Bienvenido a la ventana. ¿Qué te trae por aquí?`]),
       askBiz: ["¿A qué se dedica tu negocio? ¡Si quieres, dibújalo!", "¿Y tú a qué te dedicas? Si te es más fácil, dibújalo."],
       open: [(n) => `¡${cap(n)}!`, (n) => `${cap(n)}, ¿verdad?`],
       pitch: {
@@ -482,8 +491,8 @@ octagon|an octagon|un octàgon|un octógono`.split("\n").map((r) => { const [k, 
 
   // the model's brief: short and concrete, because a small model follows short rules best
   const FACTS = {
-    en: `You are the voice of polplanas.com and you speak as Pol Planas, in first person.
-Facts: freelance web designer in Catalonia. Designs and builds websites for small businesses so they win more clients. One person from the first call to launch. Catalan, Spanish and English. Landing page from €1,200 (2 weeks), website from €2,900 (4–5 weeks), website and brand from €4,900. Free first call, fixed price. Email pol@polplanas.com. The other pages open soon.
+    en: `You are the little voice that lives in the window of polplanas.com, the website of Pol Planas. You talk to visitors about Pol (he, not I): you are not Pol.
+Facts about Pol: freelance web designer in Catalonia. He designs and builds websites for small businesses so they win more clients. One person from the first call to launch. Catalan, Spanish and English. Landing page from €1,200 (2 weeks), website from €2,900 (4–5 weeks), website and brand from €4,900. Free first call, fixed price. Email pol@polplanas.com. The other pages open soon.
 Setting: the visitor writes or draws with a finger on a fogged, rainy window; you answer in a small label.
 How to answer: like a quick-witted shopkeeper who is good at selling and never pushy. React to the exact thing they wrote with one concrete, dry joke, then, if it fits, link it to their business or their website. Plain everyday words, the way people really talk. Never poetic, never gushing, never vague. One or two short sentences, at most 22 words. Only now and then ask about their business or suggest the free call. Never repeat a joke or an idea you already used. Don't mention the rain or the glass unless they do. No lists, no emojis, no quotes. Never invent facts, numbers, dates, availability or clients. Always in English.
 A message like [drawing: X] means they drew X on the glass: guess, with a joke, what business X could mean, and ask if you got it right.`,
@@ -500,7 +509,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
   const NOPUSH = { en: "They said no to an email for now: don't offer it again.", ca: "Ara mateix no vol correu: no l’hi tornis a oferir.", es: "Ahora mismo no quiere correo: no se lo vuelvas a ofrecer." };
   // example exchanges: a few are picked at random for each answer, so the model never settles into one joke
   const SHOTS = {
-    en: [["chips", "Chips? If you sell them, I’ll make you a website as crunchy as they are."], ["i'm bored", "Then you’re in the right place: here you can write on a window and nobody tells you off."], ["are you real", "As real as a website that talks back. Pol, on the other hand, is flesh and bone."], ["i sell clothes", "Then your website should work like a good shop window: nobody walks past. What’s your style?"], ["how long does it take", "A landing page, about two weeks. A full website, four or five."], ["nice website", "Thank you! Imagine one like it, but for your business."], ["dinosaur", "A dinosaur! If that’s your ideal client, we’ll need a very big website."], ["i don't have a business", "Not yet! When you do, you know where to find me."], ["do you speak spanish", "Sí, and Catalan too. Pol works in all three."], ["do you make apps", "Websites, not apps. But a good website on a phone often does the same job."], ["cheese", "Cheese? If you sell it, your website should make people hungry from the sofa."], ["i love you", "Careful, I fog up easily. Tell me about your business instead, it’s safer."], ["what's up", "Not much: I live in a window. What about you, what do you do?"], ["i have a bakery", "A bakery! Then your website should smell like fresh bread. Do you already have one?"], ["tell me a joke", "A client asked for a bigger logo. Now it’s the whole website."], ["football", "I only follow the drops racing down the glass. Do you run a club?"], ["[drawing: a dog]", "A dog! A vet, a groomer, or just a very good boy? Did I guess your business?"], ["[drawing: a scissors]", "Scissors! A hair salon, or a tailor? Tell me I got it right."]],
+    en: [["chips", "Chips? If you sell them, Pol will make you a website as crunchy as they are."], ["i'm bored", "Then you’re in the right place: here you can write on a window and nobody tells you off."], ["are you real", "As real as a website that talks back. Pol, on the other hand, is flesh and bone."], ["i sell clothes", "Then your website should work like a good shop window: nobody walks past. What’s your style?"], ["how long does it take", "A landing page, about two weeks. A full website, four or five."], ["nice website", "Thank you! Imagine one like it, but for your business."], ["dinosaur", "A dinosaur! If that’s your ideal client, Pol will need to build a very big website."], ["i don't have a business", "Not yet! When you do, you know where to find Pol."], ["do you speak spanish", "Sí, and Catalan too. Pol works in all three."], ["do you make apps", "Pol makes websites, not apps. But a good website on a phone often does the same job."], ["cheese", "Cheese? If you sell it, your website should make people hungry from the sofa."], ["i love you", "Careful, I fog up easily. Tell me about your business instead, it’s safer."], ["what's up", "Not much: I live in a window. What about you, what do you do?"], ["i have a bakery", "A bakery! Then your website should smell like fresh bread. Do you already have one?"], ["tell me a joke", "A client asked for a bigger logo. Now it’s the whole website."], ["football", "I only follow the drops racing down the glass. Do you run a club?"], ["[drawing: a dog]", "A dog! A vet, a groomer, or just a very good boy? Did I guess your business?"], ["[drawing: a scissors]", "Scissors! A hair salon, or a tailor? Tell me I got it right."]],
     ca: [["patates", "Patates? Si en vens, et faig una web tan cruixent com elles."], ["m'avorreixo", "Doncs ets al lloc ideal: aquí pots escriure en una finestra i ningú et renya."], ["ets real?", "Tan real com una web que contesta. En Pol, en canvi, és de carn i ossos."], ["venc roba", "Doncs la web ha de ser com un bon aparador: que ningú passi de llarg. Quin estil teniu?"], ["quant trigues", "Una landing, unes dues setmanes. Una web sencera, quatre o cinc."], ["m'agrada la web", "Gràcies! Imagina-te’n una de semblant, però per al teu negoci."], ["dinosaure", "Un dinosaure! Si és el teu client ideal, ens caldrà una web ben gran."], ["no tinc negoci", "Encara! Quan el tinguis, ja saps on trobar-me."], ["parles castellà?", "Sí, i anglès també. En Pol treballa en tots tres idiomes."], ["fas apps?", "Faig webs, no apps. Però una bona web al mòbil sovint fa la mateixa feina."]],
     es: [["patatas", "¿Patatas? Si las vendes, te hago una web tan crujiente como ellas."], ["me aburro", "Pues estás en el sitio ideal: aquí puedes escribir en una ventana y nadie te riñe."], ["eres real?", "Tan real como una web que contesta. Pol, en cambio, es de carne y hueso."], ["vendo ropa", "Pues la web tiene que ser como un buen escaparate: que nadie pase de largo. ¿Qué estilo tenéis?"], ["cuanto tardas", "Una landing, unas dos semanas. Una web completa, cuatro o cinco."], ["me gusta la web", "¡Gracias! Imagina una parecida, pero para tu negocio."], ["dinosaurio", "¡Un dinosaurio! Si es tu cliente ideal, vamos a necesitar una web muy grande."], ["no tengo negocio", "¡Todavía! Cuando lo tengas, ya sabes dónde encontrarme."], ["hablas catalán?", "Sí, e inglés también. Pol trabaja en los tres idiomas."], ["haces apps?", "Hago webs, no apps. Pero una buena web en el móvil a menudo hace el mismo trabajo."]],
   };
@@ -545,7 +554,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
     return out;
   }
   // an English answer that slipped into another language, or talks about things it must not invent
-  const WRONG = /[¿¡àèìòùáéíóúñç]|\b(google|language model|trained|openai|gemma)\b/i;
+  const WRONG = /[¿¡àèìòùáéíóúñç]|\b(google|language model|trained|openai|gemma)\b|\bi(?:'m|’m| am) pol\b|\bmy name is pol\b|\bthis is pol\b/i;
   const NUMS = new Set(["1,200", "1.200", "1200", "2,900", "2.900", "2900", "4,900", "4.900", "4900", "1", "2", "3", "4", "5", "24"]);
   const GUSH = /\b(fascinat\w*|delight\w*|indeed|truly|whisper\w*|circuits?|journey|elevat\w*|thriv\w*|flourish\w*|enchant\w*|tantaliz\w*|exquisite|wonderful\w*|splendid|marvel\w*|nuances?|genuine connection|realm|tapestry|embark\w*|sparkl\w*|magic\w*)\b/i;
   const madeUp = (s) => (s.match(/\d[\d.,]*\d|\d/g) || []).some((n) => !NUMS.has(n));
@@ -642,8 +651,10 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       const b = this.brain, id = ++b.n, L = "en";
       let sys = FACTS[L];
       if (this.biz) sys += "\n" + KNOWN[L](this.biz);
+      if (this.name) sys += `\nThe visitor's name is ${this.name}: use it now and then, naturally, never in every line.`;
+      if (this.turns < 3) sys += "\nYou have only just met: be friendly and curious about them; do not sell anything yet.";
       if (this.declined) sys += "\n" + NOPUSH[L];
-      const shots = shuffle(SHOTS[L]).slice(0, 4);
+      const meta = /^\[(first message|the visitor just told|quiet moment)/.test(text), shots = meta ? [] : shuffle(SHOTS[L]).slice(0, 4);
       if (drawing) shots.push(DRAWSHOT[L]);
       if (text.startsWith("[quiet moment")) shots.push(["[quiet moment: 21:40, evening, gentle rain; the visitor has been quiet for 40 seconds]", "Evening already. The rain gets cosier in the dark. Still with me?"]);
       const msgs = [{ role: "system", content: sys }, ...shots.flatMap(([u, a]) => [{ role: "user", content: u }, { role: "assistant", content: a }]), ...this.history.slice(-4), { role: "user", content: text }];
@@ -659,7 +670,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
     async ask(text, drawing = false, quiet = false) {
       const en = this.lang === "en" || drawing ? text : (await translate(text, "auto", "en")) || text;
       for (let i = 0; i < 2; i++) {
-        const raw = await this.think(en, 0.8 + i * 0.15, drawing), out = tidy(raw).replace(/^(ah|oh|ooh|well|hmm)[,!.]\s+/i, "").replace(/^./, (x) => x.toUpperCase());
+        const raw = await this.think(en, 0.8 + i * 0.15, drawing), out = mend(tidy(raw)).replace(/^(here'?s|here is) (my |the )?(answer|response|reply)[:.,]?\s*/i, "").replace(/^(okay|ok|sure|alright|all right)[,!.]?\s+(here we go|here you go|let'?s go)?[!.]?\s*/i, "").replace(/^(ah|oh|ooh|well|hmm)[,!.]\s+/i, "").replace(/^./, (x) => x.toUpperCase());
         const why = !out ? "empty" : WRONG.test(out) || madeUp(out) ? "off" : GUSH.test(out) && i === 0 ? "gushing" : this.saidE.some((s) => alike(s, out) > 0.5) ? "repeat" : WET.test(out) && this.wet >= 1 && !WET.test(en) ? "rain again" : "";
         console.info("[cervell]", JSON.stringify(en), "→", JSON.stringify(raw), why ? `(${why})` : "");
         if (!why || (i === 1 && out && why !== "off")) {
@@ -711,7 +722,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       const r = await this.turn(inp);
       this.turns++;
       // after the first exchange, once, the question that matters (a drawing is welcome)
-      if (r && !r.go && !r.mail && !r.waking && !this.askedBiz && !this.offer && !this.biz && !/\?\s*$/.test(r.text)) {
+      if (r && !r.go && !r.mail && !r.waking && !this.askedBiz && this.stage === "met" && !this.offer && !this.biz && !/\?\s*$/.test(r.text)) {
         this.askedBiz = true;
         this.expectDraw = performance.now() + 45000;
         r.text = `${r.text} ${this.t("askBiz")}`;
@@ -719,8 +730,48 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       if (r && r.text) this.remember(r.text);
       return r;
     }
+    // the visitor's name, from "Marta", "em dic Marta", "I'm Marta", "me llamo Marta"
+    nameOf(text) {
+      if (/[?¿]/.test(text) || /^(qui|quien|quién|who|que|què|qué|what|com|como|cómo|how|on|donde|dónde|where|quan|cuando|when|per què|por qué|why)\b/i.test(text.trim())) return null;
+      const t = text.trim().replace(/[.!?¡¿,]+/g, " ").replace(/^(hola|hi|hello|hey|ei)\s+/i, "").replace(/^(em dic|me dic|jo soc|soc|sóc|me llamo|yo soy|soy|my name is|my name's|i am|i'm|im|it's|its|name is)\s+/i, "").trim();
+      const w = t.split(/\s+/);
+      if (!t || w.length > 3) return null;
+      const n = w[0];
+      if (!/^[\p{L}][\p{L}'’-]{1,19}$/u.test(n)) return null;
+      const c = clean(n);
+      if (theme(THEMES, c) || starts(c, YES) || starts(c, NO) || /^(web|website|pagina|negoci|negocio|business|que|what|qui|who|com|how|res|nada|nothing|ningu|nadie)$/.test(c)) return null;
+      return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
+    }
+    async meet(text) {
+      const b = this.brain;
+      if (b && b.ready) {
+        const out = await this.ask(`[first message from a visitor who just arrived: "${text}". You have just met. Greet them back warmly (if they asked something, answer it in a few words), introduce yourself in one short sentence as "the little voice of this window" (you are not Pol: Pol is the web designer who made you), and ask their name.]`, false, true);
+        if (out) return /name|com et dius|llamas|tu nombre|el teu nom/i.test(out) ? out : `${out} ${this.t("askName")}`;
+      }
+      return this.t("intro");
+    }
+    async greetByName(n) {
+      const b = this.brain;
+      if (b && b.ready) {
+        const out = await this.ask(`[the visitor just told you their name: ${n}. Say you are glad to meet them, using their name, and ask, lightly, what brings them here or what they do. One or two short sentences.]`, false, true);
+        if (out && out.includes(n)) return out;
+      }
+      return this.t("met", n);
+    }
     async turn(inp) {
       const text = (inp.text[0] || "").trim(), c = clean(text), now = performance.now();
+      // meeting someone: hello and introductions first, then their name
+      if (text && !inp.asDrawing && !(inp.match && ["work", "about", "services", "contact", "price", "sun", "rain"].includes(inp.match.target))) {
+        if (this.stage === undefined && !theme(THEMES.filter((th) => th.k === "price"), c)) {
+          this.stage = "asked"; this.nameUntil = now + 90000; this.askedBiz = true;
+          return { text: await this.meet(text) };
+        }
+        if (this.stage === "asked" && now < this.nameUntil) {
+          this.stage = "met";
+          const n = this.nameOf(text);
+          if (n) { this.name = n; this.askedBiz = true; this.expectDraw = now + 45000; return { text: await this.greetByName(n) }; }
+        }
+      }
       // a short yes or no to the question just asked
       if (this.offer && now < this.offer.until && text && count(c) <= 4) {
         const o = this.offer;
@@ -789,7 +840,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
     t2(list) { const fresh = list.filter((x) => !this.said.some((s) => s.includes(x))); return pick(fresh.length ? fresh : list); }
     // the next step, offered as a plain question: rarely, never twice in a row, never after a no
     maybeOffer(line, strong = false) {
-      if (/\?\s*$/.test(line) || this.declined || this.offers >= 2 || this.turns - this.lastOffer < 4 || (!strong && Math.random() < 0.6)) return { text: line };
+      if (/\?\s*$/.test(line) || this.declined || this.turns < 4 || this.offers >= 2 || this.turns - this.lastOffer < 4 || (!strong && Math.random() < 0.6)) return { text: line };
       return this.offering(line, "contact", "offerMail");
     }
     offering(line, target, key) {

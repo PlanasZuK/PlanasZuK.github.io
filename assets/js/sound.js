@@ -214,7 +214,7 @@
       this.life.gain.setTargetAtTime(this.mix.life * lerp(1, 0.4, m), t, 0.3);
       // the overview: space comes in as the window goes far away (and stays faint behind a page)
       this.spaceLevel = ss(0.12, 0.9, s.zoom || 0) * (s.page ? 0.25 : 1);
-      if (this.sp) this.sp.out.gain.setTargetAtTime(this.spaceLevel * this.mix.space * 0.5, t, 0.6);
+      if (this.sp) this.sp.out.gain.setTargetAtTime(this.spaceLevel * this.mix.space * this.sp.norm, t, 1.2);
     },
     // a blackbird at dusk: a phrase now and then, somewhere out there, never twice in the same place
     blackbird(now) {
@@ -241,71 +241,115 @@
     touch(down, x) { if (this.on && this.fingerNode) this.fingerNode.port.postMessage(down ? { down: 1, x } : { up: 1 }); },
     wet(size) { if (this.on && this.fingerNode) this.fingerNode.port.postMessage({ wet: size }); },
     // ---------- the overview: a quiet room in space ----------
-    // Zen, not dread: a soft, bright chord in the middle register (D, A, D, F#, no sub-bass, no beating), breathing on
-    // long cycles, a thread of air, and now and then something from real space: high glass notes, and the
-    // "chorus" of Earth's magnetosphere (plasma waves recorded by NASA's Van Allen probes sound like rising
-    // bird-like whistles), all very soft inside a long, clear hall. Generated, never looped.
+    // Generative, never the same: a slow chord progression (Dmaj9, Bm11, Gmaj9, Aadd9) where each chord blooms over
+    // seconds and dissolves into the next, its voices drifting a hair out of tune and back; a breath of dark air
+    // whose colour and level wander on their own; and sparkles, tiny soft notes of the current chord in the high
+    // octaves, whose density rises and falls like a slow tide. Now and then a high glass note, or the "chorus" of
+    // Earth's magnetosphere (plasma waves recorded by NASA's Van Allen probes sound like rising bird-like whistles).
+    // All in a long, clear hall. Nothing in it holds still, so nothing in it hums.
+    SPACE_RMS: 0.0285,
+    CHORDS: [
+      [293.66, 369.99, 440, 659.25],          // Dmaj9 (D F# A E)
+      [246.94, 293.66, 369.99, 440, 659.25],  // Bm11 (B D F# A E)
+      [196, 246.94, 293.66, 440, 739.99],     // Gmaj9 (G B D A F#)
+      [220, 329.63, 440, 493.88, 554.37],     // Aadd9 (A E A B C#)
+    ],
     spaceBuild() {
       if (this.sp) return this.sp;
       const ctx = this.ctx, g = (v = 0) => { const n = ctx.createGain(); n.gain.value = v; return n; };
-      const out = g(0), dry = g(0.5), wet = g(0.95);
-      const sr = ctx.sampleRate, len = Math.round(sr * 6), ir = ctx.createBuffer(2, len, sr);
+      const out = g(0), dry = g(0.45), wet = g(1);
+      const sr = ctx.sampleRate, len = Math.round(sr * 6.5), ir = ctx.createBuffer(2, len, sr);
       for (let c = 0; c < 2; c++) {
         const d = ir.getChannelData(c);
         let lp = 0;
-        for (let i = 0; i < len; i++) { const t = i / sr, k = 0.25 + 0.5 * Math.exp(-t * 0.8); lp += (Math.random() * 2 - 1 - lp) * k; d[i] = lp * Math.exp(-t * 0.85) * clamp(t / 0.05); }
+        for (let i = 0; i < len; i++) { const t = i / sr, k = 0.22 + 0.5 * Math.exp(-t * 0.7); lp += (Math.random() * 2 - 1 - lp) * k; d[i] = lp * Math.exp(-t * 0.78) * clamp(t / 0.06); }
       }
       const hall = ctx.createConvolver(); hall.buffer = ir;
-      const tone = ctx.createBiquadFilter(); tone.type = "lowpass"; tone.frequency.value = 5200; tone.Q.value = 0.5;
-      const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 110; hp.Q.value = 0.6;
+      const tone = ctx.createBiquadFilter(); tone.type = "lowpass"; tone.frequency.value = 6000; tone.Q.value = 0.5;
+      const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 120; hp.Q.value = 0.6;
       const bus = g(1);
       bus.connect(dry).connect(tone); bus.connect(hall).connect(wet).connect(tone);
       tone.connect(hp).connect(out).connect(this.comp);
-      // the chord: four soft voices, each a sine with a whisper of its octave, swelling on its own slow cycle
-      [146.83, 220, 293.66, 369.99].forEach((f, i) => {
-        const a = ctx.createOscillator(), o8 = ctx.createOscillator(), vg = g(0), lfo = ctx.createOscillator(), lg = g(0.5), off = ctx.createConstantSource();
-        a.type = o8.type = "sine"; a.frequency.value = f; o8.frequency.value = f * 2.0008;
-        lfo.frequency.value = 0.018 + i * 0.011 + Math.random() * 0.008; off.offset.value = 0.5;
-        lfo.connect(lg).connect(vg.gain); off.connect(vg.gain);
-        const pan = ctx.createStereoPanner(); pan.pan.value = [-0.45, 0.35, -0.15, 0.5][i];
-        a.connect(vg); o8.connect(g(0.12)).connect(vg);
-        vg.connect(pan).connect(g([0.03, 0.026, 0.02, 0.013][i])).connect(bus);
-        [a, o8, lfo, off].forEach((o) => o.start());
-      });
-      // a thread of air, high and fine
-      const nb = ctx.createBuffer(2, sr * 3, sr);
-      for (let c = 0; c < 2; c++) { const d = nb.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+      // a slow loudness keeper: a generative piece swells and thins by chance, so its level is measured and
+      // gently held steady (seconds, never pumping), keeping the overview on the same scale as the window
+      const meter = ctx.createAnalyser(); meter.fftSize = 2048; hp.connect(meter);
+      // dark air: noise through a band that wanders, its level breathing on a random walk
+      const nb = ctx.createBuffer(2, sr * 4, sr);
+      for (let c = 0; c < 2; c++) { const d = nb.getChannelData(c); let p = 0; for (let i = 0; i < d.length; i++) { p = p * 0.9 + (Math.random() * 2 - 1) * 0.1; d[i] = p * 2.2; } }
       const ns = ctx.createBufferSource(); ns.buffer = nb; ns.loop = true;
-      const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = 3200; band.Q.value = 0.7;
-      const sweep = ctx.createOscillator(), sweepG = g(900); sweep.frequency.value = 0.013; sweep.connect(sweepG).connect(band.frequency);
-      ns.connect(band).connect(g(0.004)).connect(bus); ns.start(); sweep.start();
-      return (this.sp = { out, bus, next: 0 });
+      const band = ctx.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = 700; band.Q.value = 0.8;
+      const air = g(0.02); ns.connect(band).connect(air).connect(bus); ns.start();
+      return (this.sp = { out, bus, band, air, meter, buf: new Float32Array(2048), rms: 0.02, norm: 1, chord: 0, nextChord: 0, nextSpark: 0, nextGlint: 0, tide: 0.5, tideT: 0.5, airT: 0 });
     },
-    // now and then: a high glass note of the chord's scale, or a little "chorus" of rising whistles from space
+    // one voice of a chord: a sine with a whisper of its octave, blooming in, drifting, dissolving out
+    pad(f, at, hold, amp, pan) {
+      const ctx = this.ctx, S = this.sp, o = ctx.createOscillator(), o8 = ctx.createOscillator(), e = ctx.createGain(), p = ctx.createStereoPanner(), o8g = ctx.createGain();
+      o.type = o8.type = "sine"; o.frequency.value = f; o8.frequency.value = f * 2; o8g.gain.value = 0.1;
+      // a slow drift of tuning: never two identical moments
+      o.detune.setValueAtTime((Math.random() - 0.5) * 6, at); o.detune.linearRampToValueAtTime((Math.random() - 0.5) * 9, at + hold);
+      const rise = 5 + Math.random() * 4, fall = 7 + Math.random() * 5;
+      e.gain.setValueAtTime(0, at); e.gain.linearRampToValueAtTime(amp, at + rise); e.gain.setValueAtTime(amp, at + hold); e.gain.linearRampToValueAtTime(0, at + hold + fall);
+      p.pan.value = pan;
+      o.connect(e); o8.connect(o8g).connect(e); e.connect(p).connect(S.bus);
+      o.start(at); o8.start(at); o.stop(at + hold + fall + 0.2); o8.stop(at + hold + fall + 0.2);
+    },
+    // the overview's life, a few times a second: chords, sparkles, air, glints
     spaceGlint(now) {
-      const S = this.sp; if (!S || now < S.next) return;
-      S.next = now + 4000 + Math.random() * 7000;
-      if (this.spaceLevel < 0.3) return;
-      const ctx = this.ctx, t0 = ctx.currentTime;
-      if (Math.random() < 0.65) {
-        const f = [1174.66, 1318.51, 1479.98, 1760, 1975.53][(Math.random() * 5) | 0];
-        [1, 2.01].forEach((r, k) => {
-          const o = ctx.createOscillator(), e = ctx.createGain(), pan = ctx.createStereoPanner();
-          o.type = "sine"; o.frequency.value = f * r;
-          e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime((k ? 0.0015 : 0.008) * (0.7 + Math.random() * 0.6), t0 + 0.01); e.gain.setTargetAtTime(0, t0 + 0.02, k ? 0.5 : 1.6);
-          pan.pan.value = Math.random() * 1.4 - 0.7;
-          o.connect(e).connect(pan).connect(S.bus); o.start(t0); o.stop(t0 + 8);
-        });
-      } else {
-        // the magnetosphere's chorus: two to four soft rising whistles, like distant birds
-        const n = 2 + ((Math.random() * 3) | 0), pan = Math.random() * 1.4 - 0.7;
-        for (let i = 0; i < n; i++) {
-          const t = t0 + i * (0.22 + Math.random() * 0.25), f0 = 650 + Math.random() * 300, d = 0.28 + Math.random() * 0.2;
-          const o = ctx.createOscillator(), e = ctx.createGain(), p = ctx.createStereoPanner();
-          o.type = "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * (1.8 + Math.random() * 0.6), t + d);
-          e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(0.004 + Math.random() * 0.003, t + d * 0.3); e.gain.linearRampToValueAtTime(0, t + d);
-          p.pan.value = pan + (Math.random() - 0.5) * 0.3;
-          o.connect(e).connect(p).connect(S.bus); o.start(t); o.stop(t + d + 0.05);
+      const S = this.sp; if (!S) return;
+      const ctx = this.ctx, t = ctx.currentTime, live = this.spaceLevel > 0.05;
+      if (live) {
+        S.meter.getFloatTimeDomainData(S.buf);
+        let e = 0; for (let i = 0; i < S.buf.length; i += 2) e += S.buf[i] * S.buf[i];
+        S.rms += (Math.sqrt(e / (S.buf.length / 2)) - S.rms) * 0.02;
+        S.norm = clamp(this.SPACE_RMS / Math.max(1e-4, S.rms), 0.5, 3);
+      }
+      // the next chord blooms while the last one dissolves
+      if (now >= S.nextChord && live) {
+        const hold = 16 + Math.random() * 10, ch = this.CHORDS[S.chord % this.CHORDS.length];
+        S.chord += Math.random() < 0.8 ? 1 : 2;
+        ch.forEach((f, i) => this.pad(f, t + i * (0.4 + Math.random() * 0.9), hold, [0.03, 0.026, 0.022, 0.016, 0.012][i] || 0.012, (i % 2 ? 1 : -1) * (0.15 + Math.random() * 0.4)));
+        S.nextChord = now + (hold + 2) * 1000;
+      }
+      // the air breathes: its colour and level wander
+      if (now >= S.airT) {
+        S.airT = now + 2500 + Math.random() * 3000;
+        S.band.frequency.setTargetAtTime(380 + Math.random() * 900, t, 2.5);
+        S.air.gain.setTargetAtTime(0.012 + Math.random() * 0.02, t, 3);
+      }
+      // the sparkles follow a slow tide: some moments glitter, some are nearly still
+      if (Math.random() < 0.01) S.tideT = Math.random();
+      S.tide += (S.tideT - S.tide) * 0.01;
+      if (now >= S.nextSpark && live) {
+        S.nextSpark = now + 180 + (1 - S.tide) * 1600 + Math.random() * 700;
+        const ch = this.CHORDS[(S.chord + this.CHORDS.length - 1) % this.CHORDS.length], f = ch[(Math.random() * ch.length) | 0] * (Math.random() < 0.6 ? 4 : 2);
+        const o = ctx.createOscillator(), e = ctx.createGain(), p = ctx.createStereoPanner(), d = 0.6 + Math.random() * 1.6;
+        o.type = "sine"; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 10;
+        e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime((0.0025 + Math.random() * 0.004) * (0.5 + S.tide), t + 0.02 + Math.random() * 0.15); e.gain.setTargetAtTime(0, t + 0.2, d / 3);
+        p.pan.value = Math.random() * 1.8 - 0.9;
+        o.connect(e).connect(p).connect(S.bus); o.start(t); o.stop(t + d + 1.5);
+      }
+      // now and then, something from further away
+      if (now >= S.nextGlint && live) {
+        S.nextGlint = now + 9000 + Math.random() * 14000;
+        if (Math.random() < 0.5) {
+          const f = [1174.66, 1318.51, 1479.98, 1760][(Math.random() * 4) | 0];
+          [1, 2.01].forEach((r, k) => {
+            const o = ctx.createOscillator(), e = ctx.createGain(), p = ctx.createStereoPanner();
+            o.type = "sine"; o.frequency.value = f * r;
+            e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(k ? 0.002 : 0.01, t + 0.01); e.gain.setTargetAtTime(0, t + 0.02, k ? 0.5 : 1.7);
+            p.pan.value = Math.random() * 1.4 - 0.7;
+            o.connect(e).connect(p).connect(S.bus); o.start(t); o.stop(t + 8);
+          });
+        } else {
+          const n = 2 + ((Math.random() * 3) | 0), pan = Math.random() * 1.4 - 0.7;
+          for (let i = 0; i < n; i++) {
+            const at = t + i * (0.22 + Math.random() * 0.25), f0 = 650 + Math.random() * 300, d = 0.28 + Math.random() * 0.2;
+            const o = ctx.createOscillator(), e = ctx.createGain(), p = ctx.createStereoPanner();
+            o.type = "sine"; o.frequency.setValueAtTime(f0, at); o.frequency.exponentialRampToValueAtTime(f0 * (1.8 + Math.random() * 0.6), at + d);
+            e.gain.setValueAtTime(0, at); e.gain.linearRampToValueAtTime(0.005 + Math.random() * 0.003, at + d * 0.3); e.gain.linearRampToValueAtTime(0, at + d);
+            p.pan.value = pan + (Math.random() - 0.5) * 0.3;
+            o.connect(e).connect(p).connect(S.bus); o.start(at); o.stop(at + d + 0.05);
+          }
         }
       }
     },
