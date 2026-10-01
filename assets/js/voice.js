@@ -647,6 +647,26 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       }
       return "";
     }
+    // is the visitor talking to me, or just playing with the glass? Only a real attempt deserves an answer
+    deliberate(inp) {
+      const f = inp.f || {}, now = performance.now(), asked = now < (this.expectDraw || 0);
+      if (f.wipe) return false;
+      if (inp.match) return true;
+      const raw = (inp.text && inp.text[0]) || "", textOK = !!(inp.textual && inp.wordy && (f.density || 0) < 8);
+      let drawOK = false;
+      const d = inp.draw && inp.draw[0];
+      if (d && typeof d !== "string") {
+        const gap = inp.draw[1] ? inp.draw[1].s - d.s : 9;
+        const NOISE = ["tornado", "hurricane", "squiggle", "zigzag", "line", "spiral", "snake", "garden hose", "string bean", "stitches", "constellation", "rain", "grass", "ocean", "river", "see saw", "diving board", "hockey stick", "paper clip", "boomerang", "lightning"];
+        const sure = d.s <= (asked ? 2.2 : 1.3) || (gap >= (asked ? 0.7 : 1.1) && d.s <= (asked ? 3.2 : 2.6));
+        drawOK = NOISE.includes(d.l) ? asked && d.l === "lightning" && d.s < 0.6 : sure && (f.density || 0) < (asked ? 10 : 7.5);
+      }
+      // a confident drawing beats a two-letter "word" read out of its lines
+      const c = clean(raw), known = !!(theme(THEMES, c) || starts(c, YES) || starts(c, NO) || /^(hi|hey|ei|yo|ok|oh|ha|haha|wow|uau|hola|bye|adeu|pol)$/.test(c));
+      inp.asDrawing = drawOK && (!textOK || (raw.trim().length <= 3 && !known));
+      if (inp.asDrawing) inp.textual = false;
+      return textOK || drawOK;
+    }
     // one turn of the conversation. The input is what the recognisers saw: text guesses, drawing guesses and the shape.
     async answer(inp) {
       if (typeof inp === "string") inp = { text: [inp], draw: [], strokes: 1, match: null, textual: true };
@@ -672,7 +692,7 @@ Cómo respondes: reacciona a lo concreto que ha escrito, con una ocurrencia nuev
       this.offer = null;
       // a drawing: when we just asked for one, or when the strokes look like a picture rather than a word
       const draw = (inp.draw || []).map((d) => (typeof d === "string" ? { l: d, s: 2.5 } : d));
-      if (draw.length && !inp.textual && (now < (this.expectDraw || 0) || inp.strokes >= 2)) return this.drawing(draw, now);
+      if (draw.length && !inp.textual && (now < (this.expectDraw || 0) || inp.strokes >= 2 || inp.asDrawing)) return this.drawing(draw, now);
       if (!text) return { text: this.t("blank") };
       const key = (inp.match && inp.match.target) || theme(THEMES, c);
       // greetings and rudeness get a fresh answer from the model when it is awake; prices and pages stay exact

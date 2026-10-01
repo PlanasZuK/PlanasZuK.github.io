@@ -36,6 +36,27 @@
     });
     return best;
   }
+  // the shape of what the finger did, to tell writing and drawing from simply playing with the glass
+  function shape(ink) {
+    let L = 0, rev = 0, longest = 0, maxDur = 0;
+    for (const [xs, ys, ts] of ink) {
+      let sl = 0, px = xs[0], py = ys[0], dx0 = 0, dy0 = 0;
+      for (let i = 1; i < xs.length; i++) {
+        const dx = xs[i] - px, dy = ys[i] - py, d = Math.hypot(dx, dy);
+        if (d < 6) continue; // look at the path every few pixels, not at the jitter
+        sl += d;
+        if (dx0 || dy0) { const c = (dx * dx0 + dy * dy0) / (d * Math.hypot(dx0, dy0)); if (c < -0.5) rev++; }
+        dx0 = dx; dy0 = dy; px = xs[i]; py = ys[i];
+      }
+      L += sl; longest = Math.max(longest, sl); maxDur = Math.max(maxDur, (ts[ts.length - 1] - ts[0]) / 1000);
+    }
+    const xs = ink.flatMap((s) => s[0]), ys = ink.flatMap((s) => s[1]);
+    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys), diag = Math.hypot(w, h) || 1;
+    const area = (w * h) / (innerWidth * innerHeight), density = L / diag;
+    // scrubbing back and forth, long sweeps across the pane, or circling one spot: the hand is playing
+    const wipe = area > 0.42 || density > 11 || (rev >= 6 && density > 6) || (maxDur > 4 && density > 5) || (ink.length === 1 && longest > Math.max(innerWidth, innerHeight) * 0.9);
+    return { strokes: ink.length, area: +area.toFixed(3), density: +density.toFixed(2), rev, maxDur: +maxDur.toFixed(2), wipe };
+  }
   class Ink {
     constructor({ lang = "en", onInk, onReading, delay = 1900 }) {
       this.lang = lang; this.onInk = onInk; this.onReading = onReading; this.delay = delay;
@@ -65,8 +86,10 @@
       const xs = ink.flatMap((s) => s[0]), ys = ink.flatMap((s) => s[1]);
       const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
       if (w < 24 || h > innerHeight * 0.92) return;
+      const f = shape(ink);
+      // plainly playing with the glass: nothing to read, no need to ask anyone
+      if (f.wipe && (f.area > 0.55 || f.density > 16)) { if (this.onIgnore) this.onIgnore(f); return; }
       this.busy = true;
-      if (this.onReading) this.onReading();
       // the same strokes go to two of Google's recognisers at once: handwriting, and drawings (the AutoDraw one)
       const ask = async (app, language, extra = {}) => {
         try {
@@ -91,7 +114,9 @@
         // real writing reads the same way several times ("hi", "Hi", "hin"); a drawing reads as scattered guesses
         const top = clean(text[0] || ""), near = text.slice(1, 5).filter((c) => lev(clean(c), top) <= 1).length;
         const textual = !!m || (top.length >= 2 && near >= 2);
-        if (this.onInk) this.onInk({ text, draw, aspect: w / Math.max(1, h), strokes: ink.length, match: m, textual });
+        // a word that looks like a word: not one letter, not the same letter over and over, with a vowel or a digit
+        const raw = clean(text[0] || ""), wordy = raw.length >= 2 && raw.length <= 24 && /[aeiouy0-9]/.test(raw) && !/^(.)\1+$/.test(raw);
+        if (this.onInk) this.onInk({ text, draw, aspect: w / Math.max(1, h), strokes: ink.length, match: m, textual, wordy, f });
       } finally { this.busy = false; }
     }
   }

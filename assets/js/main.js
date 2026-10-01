@@ -420,6 +420,13 @@
       if (k === "storm") { gsap.timeline().to(rain.state, { storm: 1, duration: 2.5, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 6, ease: "sine.inOut" }, "+=18"); gsap.delayedCall(2.6, () => { rain.state.flash = 0.9; gsap.to(rain.state, { flash: 0, duration: 1, ease: "power2.out" }); if (window.Sound) Sound.thunder(0.15); }); }
     };
     // every turn of the conversation goes through here
+    let played = 0, nudged = 0;
+    const ignored = () => {
+      if (!voice || mode !== "focus") return;
+      played++;
+      const now = performance.now();
+      if (played >= 3 && now - nudged > 25000 && !vEl.classList.contains("is-on")) { nudged = now; played = 0; voice.say(voice.t("hello"), 4.5); }
+    };
     const handle = async (input) => {
       if (mode !== "focus" || busy || !voice) return;
       const a = await voice.answer(input);
@@ -431,8 +438,16 @@
       voice.say(a.text, a.waking ? 30 : hold, a.waking ? "waking" : "");
     };
     const ink = window.Ink ? new Ink({ lang: LANG,
-      onReading: () => voice && voice.typing(20),
-      onInk: (input) => { if (window.__pp) (window.__inks = window.__inks || []).push(input); handle(input); },
+      // only a real attempt to say something gets an answer; playing with the glass is left in peace,
+      // with a gentle reminder now and then of what the glass can do
+      onInk: (input) => {
+        if (window.__pp) (window.__inks = window.__inks || []).push(input);
+        if (!voice || !voice.deliberate(input)) return ignored();
+        played = 0;
+        voice.typing(20);
+        handle(input);
+      },
+      onIgnore: () => ignored(),
     }) : null;
     let wrote = false, lastHint = 0, introEnd = Infinity;
     el.addEventListener("pointerdown", (e) => {
