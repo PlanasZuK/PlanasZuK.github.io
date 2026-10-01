@@ -46,11 +46,11 @@ export async function tune(rain, sky) {
   if (window.Sound) {
     const SK = "pp-sound-mix";
     try { const m = JSON.parse(localStorage.getItem(SK) || "null"); if (m) for (const k in m) Sound.setMix(k, m[k]); } catch (e) {}
-    const SL = { master: "Volum general", room: "Sala (reverberació)", bed: "Pluja de fora", patter: "Gotes a l’ampit i les fulles", drips: "Degoteig de la canal", taps: "Gotes que piquen al vidre", wind: "Vent", finger: "El dit al vidre", thunder: "Trons", keys: "Tecles de la veu", ui: "Botons", whoosh: "Moviment de la càmera" };
+    const SL = { master: "Volum general", outside: "Pluja de fora (a través del vidre)", glass: "Pluja tocant el vidre", drops: "Gotes soltes al vidre", thunder: "Trons", finger: "El dit al vidre", keys: "Tecles de la veu", room: "Sala (reverberació de les gotes)" };
     const sf = gui.addFolder("So");
     for (const k of Object.keys(Sound.mix)) sf.add(Sound.mix, k, 0, k === "master" ? 1.5 : 2, 0.01).name(SL[k] || k).onChange((v) => { Sound.setMix(k, v); try { localStorage.setItem(SK, JSON.stringify(Sound.mix)); } catch (e) {} });
-    sf.add({ t: () => Sound.post({ thunder: 0.25 }) }, "t").name("Fer un tro a prop");
-    sf.add({ t: () => Sound.post({ thunder: 0.85 }) }, "t").name("Fer un tro lluny");
+    sf.add({ t: () => { Sound.lastBoom = -99; Sound.boom(0.2); } }, "t").name("Fer un tro a prop");
+    sf.add({ t: () => { Sound.lastBoom = -99; Sound.boom(0.85); } }, "t").name("Fer un tro lluny");
     sf.close();
   }
   const act = {

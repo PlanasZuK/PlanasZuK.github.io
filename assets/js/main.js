@@ -929,10 +929,8 @@
     if (FXOK) FX.tick(now);
     // the sound follows the scene: rain, wind, hour, storm, the camera pulling back, the fingertip
     if (window.Sound && Sound.on && hero.rain) {
-      const r = hero.rain, s = r.state, dz = Math.abs(Z.v - (follow.z || 0)) * 60;
-      follow.z = Z.v;
-      follow.wh = Math.max(dz, (follow.wh || 0) * 0.9);
-      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0, whoosh: Math.min(1, follow.wh * 0.6) }, now);
+      const r = hero.rain, s = r.state;
+      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0 }, now);
     }
   });
   const fontsReady = Promise.race([d.fonts ? d.fonts.ready : Promise.resolve(), new Promise((res) => setTimeout(res, 1600))]);
