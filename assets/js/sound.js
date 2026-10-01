@@ -82,6 +82,7 @@
         await ctx.audioWorklet.addModule("/assets/js/finger-worklet.js");
         this.fingerNode = new AudioWorkletNode(ctx, "finger", { numberOfInputs: 0, outputChannelCount: [2] });
         this.fingerOut = g(this.mix.finger); this.fingerNode.connect(this.fingerOut).connect(this.near);
+        this.squeaks = 0; this.fingerNode.port.onmessage = (e) => { if (e.data.squeak) this.squeaks++; };
       } catch (e) { this.fingerNode = null; }
       document.addEventListener("visibilitychange", () => { if (!this.on) return; if (document.hidden) ctx.suspend(); else ctx.resume(); });
       this.beds = {}; this.voices = [];
