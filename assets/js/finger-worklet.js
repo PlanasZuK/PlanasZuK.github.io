@@ -53,7 +53,7 @@ class Finger extends AudioWorkletProcessor {
     // the colour of the rub moves with speed and texture
     const fc = 650 + 1500 * Math.min(1, v) * (0.75 + 0.5 * this.tex);
     this.rubA.set("bp", fc, 0.7); this.rubB.set("bp", fc * 2.3, 1.1); this.air.set("bp", 5200 + 2000 * this.tex, 0.9);
-    const rubAmp = 0.22 * Math.pow(v, 0.55) * (0.55 + 0.7 * this.tex) * this.press, airAmp = 0.05 * Math.pow(v, 1.2);
+    const rubAmp = 0.15 * Math.pow(v, 0.55) * (0.55 + 0.7 * this.tex) * this.press, airAmp = 0.05 * Math.pow(v, 1.2);
     // stick-slip: the skin grips the wet glass and lets go hundreds of times a second: that is the squeak.
     // It chatters on and off by itself while the finger moves; it catches more when slow, starting, braking or
     // turning, and the faster the finger goes, the higher and shorter it sings
@@ -67,7 +67,7 @@ class Finger extends AudioWorkletProcessor {
         const want = (0.25 + 0.75 * slow) * (0.6 + 0.4 * this.press) + Math.min(1, Math.abs(this.a)) * 0.4 + this.turn * 0.6;
         if (rnd() < Math.min(0.95, want)) {
           sq.on = 1; sq.dwell = 0.05 + rnd() * (0.35 - Math.min(0.25, v * 0.15));
-          sq.amp = 0.06 + rnd() * 0.07; this.turn = 0;
+          sq.amp = 0.095 + rnd() * 0.1; this.turn = 0;
           this.modeA.set("bp", 1250 + rnd() * 450, 6); this.modeB.set("bp", 2600 + rnd() * 700, 8);
           this.port.postMessage({ squeak: 1 });
         } else sq.dwell = 0.02 + rnd() * 0.12;
