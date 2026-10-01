@@ -24,7 +24,7 @@ class BQ {
 class Finger extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.model = 3; this.v = 0; this.vT = 0; this.a = 0; this.turn = 0; this.contact = 0; this.x = 0; this.level = 1;
+    this.model = 2; this.v = 0; this.vT = 0; this.a = 0; this.turn = 0; this.contact = 0; this.x = 0; this.level = 1;
     this.tex = 0.5; this.texT = 0.5; this.texN = 0; this.press = 0.6; this.pressT = 0.6;
     this.rubA = new BQ(); this.rubB = new BQ(); this.rubHP = new BQ().set("hp", 260, 0.7); this.air = new BQ();
     this.sq = null; this.sqCool = 0; this.modeA = new BQ(); this.modeB = new BQ(); this.sqLP = new BQ().set("lp", 3200, 0.6);

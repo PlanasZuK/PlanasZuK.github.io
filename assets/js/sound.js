@@ -18,7 +18,7 @@
   const S = {
     on: false, want: false, ctx: null, last: 0, buf: {}, sprites: null, st: { rain: 1, wind: 0, gust: 0, night: 0, storm: 0, hour: 7, zoom: 0, page: 0, muffle: 0, finger: 0, fx: 0 },
     // the mix, layer by layer (?tune shows a slider for each)
-    mix: { master: 0.34, outside: 1, glass: 0.55, drops: 0.5, thunder: 0.85, life: 1, space: 1, finger: 0.8, fingerV: 3, voice: 1, room: 0.2 },
+    mix: { master: 0.34, outside: 1, glass: 0.55, drops: 0.5, thunder: 0.85, life: 1, space: 1, finger: 0.8, fingerV: 2, voice: 1, room: 0.2 },
     pref() { try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; } },
     save(v) { try { localStorage.setItem(KEY, v ? "1" : "0"); } catch (e) {} },
     // Opus where the browser decodes it, AAC otherwise

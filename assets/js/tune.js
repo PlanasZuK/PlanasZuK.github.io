@@ -48,7 +48,7 @@ export async function tune(rain, sky) {
     try { const m = JSON.parse(localStorage.getItem(SK) || "null"); if (m) for (const k in m) Sound.setMix(k, m[k]); } catch (e) {}
     const SL = { master: "Volum general", outside: "Pluja de fora (a través del vidre)", glass: "Pluja tocant el vidre", drops: "Gotes soltes al vidre", thunder: "Trons", life: "Vida de fora (ocells, merla, nit)", space: "Espai (menú i targetes)", finger: "El dit al vidre", voice: "La veu del robotet", room: "Sala (reverberació de les gotes)" };
     const sf = gui.addFolder("So");
-    sf.add(Sound.mix, "fingerV", { "v4 (física + gravació real)": 3, "v2 (modelat)": 2, "v1 (soroll suau)": 1 }).name("So del dit").onChange((v) => { Sound.setMix("fingerV", +v); try { localStorage.setItem(SK, JSON.stringify(Sound.mix)); } catch (e) {} });
+    sf.add(Sound.mix, "fingerV", { "v2 (modelat)": 2, "v4 (física + gravació real)": 3, "v1 (soroll suau)": 1 }).name("So del dit").onChange((v) => { Sound.setMix("fingerV", +v); try { localStorage.setItem(SK, JSON.stringify(Sound.mix)); } catch (e) {} });
     for (const k of Object.keys(Sound.mix).filter((k) => k !== "fingerV")) sf.add(Sound.mix, k, 0, k === "master" ? 1.5 : 2, 0.01).name(SL[k] || k).onChange((v) => { Sound.setMix(k, v); try { localStorage.setItem(SK, JSON.stringify(Sound.mix)); } catch (e) {} });
     sf.add({ t: () => { Sound.lastBoom = -99; Sound.boom(0.2); } }, "t").name("Fer un tro a prop");
     sf.add({ t: () => { Sound.lastBoom = -99; Sound.boom(0.85); } }, "t").name("Fer un tro lluny");
