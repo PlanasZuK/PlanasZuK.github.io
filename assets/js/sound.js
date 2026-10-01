@@ -18,7 +18,7 @@
   const S = {
     on: false, want: false, ctx: null, last: 0, buf: {}, sprites: null, st: { rain: 1, wind: 0, gust: 0, night: 0, storm: 0, hour: 7, zoom: 0, page: 0, muffle: 0, finger: 0, fx: 0 },
     // the mix, layer by layer (?tune shows a slider for each)
-    mix: { master: 0.34, outside: 1, glass: 0.55, drops: 0.5, thunder: 0.85, life: 1, space: 1, finger: 0.8, fingerV: 2, voice: 1, room: 0.2 },
+    mix: { master: 0.34, outside: 1, glass: 0.55, drops: 0.5, thunder: 0.85, life: 1, space: 1, finger: 0.8, fingerV: 3, voice: 1, room: 0.2 },
     pref() { try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; } },
     save(v) { try { localStorage.setItem(KEY, v ? "1" : "0"); } catch (e) {} },
     // Opus where the browser decodes it, AAC otherwise
@@ -197,7 +197,8 @@
       this.outside.gain.setTargetAtTime(this.mix.outside * lerp(1, 0.4, m), t, 0.3);
       this.glass.gain.setTargetAtTime(this.mix.glass * lerp(1, 0.3, m), t, 0.3);
       // the fingertip
-      const f = clamp(s.finger, 0, 1.5) * (1 - m), v2 = this.fingerNode && this.mix.fingerV === 2;
+      const f = clamp(s.finger, 0, 1.5) * (1 - m), v2 = this.fingerNode && this.mix.fingerV >= 2;
+      if (this.fingerNode && this.fingerModel !== this.mix.fingerV) { this.fingerModel = this.mix.fingerV; this.fingerNode.port.postMessage({ model: this.mix.fingerV }); }
       this.fingerGain.gain.setTargetAtTime(v2 ? 0 : 0.42 * Math.pow(f, 0.8) * this.mix.finger, t, 0.03);
       if (this.fingerOut) this.fingerOut.gain.setTargetAtTime(v2 ? this.mix.finger * (1 - m) : 0, t, 0.05);
       this.fingerBand.frequency.setTargetAtTime(1600 + 1800 * clamp(f), t, 0.05);
