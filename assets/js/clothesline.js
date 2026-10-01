@@ -49,10 +49,10 @@
   const W0 = {
     fov: 27 * Math.PI / 180, camZ: 4.25,
     lineY: 0.66, sag: 0.05, depth: 0.1,            // the cord: height at the middle, how it rises and recedes towards the sides
-    rope: 0.0105,                                    // rope radius (4 mm)
-    pegDrop: 0.075,                                  // the pegs grip the paper this far under the cord
+    rope: 0.0068,                                    // rope radius (4 mm)
+    pegDrop: 0.058, pegSize: 0.72,                                  // the pegs grip the paper this far under the cord
     sun: (() => { const v = [-0.42, 0.62, 0.66], l = Math.hypot(...v); return v.map((x) => x / l); })(),
-    sunCol: [1.95, 1.84, 1.64], skyUp: [0.34, 0.44, 0.58], skyDown: [0.2, 0.24, 0.19],
+    sunCol: [1.9, 1.9, 1.94], skyUp: [0.24, 0.4, 0.66], skyDown: [0.3, 0.38, 0.5],
     g: 54,                                           // gravity in units/s²
   };
 
@@ -61,7 +61,29 @@
 uniform vec3 uSun, uSunCol, uSkyUp, uSkyDown, uEye; uniform sampler2D uSky; uniform vec2 uSkyFit; uniform vec2 uSkyOff; uniform float uSkyOk;
 vec3 toLin(vec3 c) { return pow(c, vec3(2.2)); }
 // the sky photograph, as seen in a direction (for reflections) or behind a point on screen
-vec3 skyAt(vec2 suv, float lod) { return uSkyOk > .5 ? textureLod(uSky, suv * uSkyFit + (1. - uSkyFit) * .5 + uSkyOff, lod).rgb : mix(uSkyDown, uSkyUp, suv.y); }
+uniform float uST;
+float h12s(vec2 p) { p = fract(p * vec2(233.34, 851.73)); p += dot(p, p + 23.45); return fract(p.x * p.y); }
+float ns(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h12s(i), h12s(i + vec2(1, 0)), f.x), mix(h12s(i + vec2(0, 1)), h12s(i + 1.), f.x), f.y); }
+float fbms(vec2 p) { float s = 0., a = .5; for (int i = 0; i < 5; i++) { s += a * ns(p); p = p * 2.02 + 3.1; a *= .5; } return s; }
+// the sky, linear light; suv is the screen (0..1, y up), slightly larger than it so reflections can look past the edges
+vec3 skyAt(vec2 suv, float lod) {
+  vec2 q = suv;
+  vec3 deep = vec3(.035, .16, .52), mid = vec3(.1, .33, .72), pale = vec3(.5, .7, .93);
+  float g = clamp(q.y * .7 + (1. - q.x) * .25, 0., 1.);
+  vec3 c = mix(deep, mid, smoothstep(0., .75, g));
+  // the sun, just out of frame top left: a wide haze, a brighter core
+  float d = length((q - vec2(-.08, 1.12)) * vec2(1., 1.25));
+  c = mix(c, pale, exp(-d * 2.6) * .8);
+  c += vec3(1., .99, .97) * exp(-d * 5.5) * .5;
+  // high, thin wisps, drawn out along the wind, drifting very slowly
+  vec2 w = vec2(q.x * 1.6 + q.y * .9, q.y * 2.4 - q.x * .5) + vec2(uST * .006, 0.);
+  float n = fbms(w * 1.3 + fbms(w * .8 + uST * .003) * .9);
+  float wisp = smoothstep(.5, .85, n) * (.35 + .65 * smoothstep(.15, .9, q.y));
+  c = mix(c, pale * 1.05, wisp * .42);
+  // and a softer, lower haze over the horizon
+  c = mix(c, vec3(.22, .44, .76), smoothstep(.35, -.1, q.y) * .35);
+  return c;
+}
 vec3 skyDir(vec3 d, float lod) { return skyAt(clamp(vec2(.5 + d.x * .42, .5 + d.y * .5), 0., 1.), lod); }
 float h12(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(h12(i), h12(i + vec2(1, 0)), f.x), mix(h12(i + vec2(0, 1)), h12(i + 1.), f.x), f.y); }
@@ -113,7 +135,7 @@ void main() {
   // the clouds drift and slowly change shape (two offset layers of the same photograph, crossfaded)
   float t = uT * .004;
   vec2 w = vec2(n2(uv * 2.3 + uT * .02), n2(uv * 2.3 - uT * .017 + 7.)) - .5;
-  vec3 c = skyAt(uv + vec2(t, 0.) + w * .014, 0.);
+  vec3 c = skyAt(uv, 0.);
   o0 = vec4(c * 1.04 * uEnc, 1.);
   vec2 v = (uPar - uPPar) * 2.;
   o1 = vec4(clamp(v * 4. + .5, 0., 1.), 1., 0.);
@@ -139,7 +161,7 @@ float pegShadow(vec4 pg) {
   return smoothstep(.018, .042, d);
 }
 void main() {
-  vec3 paper = vec3(.86, .855, .83);
+  vec3 paper = vec3(.86, .87, .88);
   vec2 iuv = (vUv - uBorder) / (1. - 2. * uBorder);
   float inImg = step(0., iuv.x) * step(iuv.x, 1.) * step(0., iuv.y) * step(iuv.y, 1.);
   vec3 alb = paper; float rough = .62, gloss = .12, dens = 0.;
@@ -181,9 +203,9 @@ void main() {
   float a = vUv.y, b = sqrt(max(0., 1. - a * a));
   vec3 V = normalize(uEye - vP), S = normalize(vN), N = normalize(S * a + V * b);
   // three strands twisted together, and the fuzz of cotton
-  float tw = fract(vUv.x * 52. + a * .55);
+  float tw = fract(vUv.x * 80. + a * .55);
   float groove = smoothstep(.0, .18, tw) * smoothstep(1., .82, tw);
-  vec3 alb = vec3(.5, .47, .41) * (.55 + .45 * groove) * (.9 + .2 * n2(vUv * vec2(400., 3.)));
+  vec3 alb = vec3(.62, .63, .62) * (.7 + .3 * groove) * (.9 + .2 * n2(vUv * vec2(400., 3.)));
   vec3 col = light(vP, N, alb, .85, .05, 1.) * (.6 + .4 * b);
   put(col, length(uEye - vP));
 }`;
@@ -197,7 +219,7 @@ void main() { vec3 o = aP * 2. * uHalf; vO = o; vCur = uVP * uM * vec4(o, 1.); v
   const PEG_FS = `#version 300 es
 precision highp float;
 in vec3 vO;
-uniform mat4 uM; uniform vec3 uCamO, uHalf; uniform float uSeed;
+uniform mat4 uM; uniform vec3 uCamO, uHalf; uniform float uSeed; uniform sampler2D uWood; uniform float uWoodOk;
 ${COMMON}
 ${ENC}
 float sdRB(vec3 p, vec3 b, float r) { vec3 q = abs(p) - b + r; return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.) - r; }
@@ -235,6 +257,12 @@ void main() {
     float g = smoothstep(.2, .9, sin(p.y * 180. + n2(p.xy * vec2(30., 5.) + uSeed) * 7.) * .5 + .5);
     vec3 w0 = mix(vec3(.56, .45, .34), vec3(.5, .47, .42), fract(uSeed * .37)), w1 = w0 * vec3(1.18, 1.14, 1.1);
     alb = toLin(mix(w0, w1, g * .45 + .25 * n2(p.yz * 300.) + .2 * n2(p.xy * vec2(9., 2.) + uSeed)));
+    if (uWoodOk > .5) {
+      // a photograph of beech: the grain runs the length of the peg, each peg cut from its own part of the board
+      vec2 o = vec2(fract(uSeed * .618), fract(uSeed * .382));
+      vec3 wx = toLin(texture(uWood, vec2(p.y * 1.6, p.z * 6.) + o).rgb), wz = toLin(texture(uWood, vec2(p.y * 1.6, p.x * 6.) + o).rgb);
+      alb = mix(wz, wx, smoothstep(.4, .9, abs(n.x))) * vec3(.94, .96, 1.);
+    }
     alb *= .82 + .18 * smoothstep(.17, .12, abs(p.y));                // the ends darker, handled and weathered
     rough = .7; gloss = .08;
   }
@@ -266,6 +294,9 @@ void main() {
 precision highp float;
 in vec2 vUv; out vec4 o;
 uniform sampler2D uCol, uVel; uniform vec2 uRes; uniform float uT, uFocus, uAperture, uEnc, uGrain, uBloom, uVig, uFade, uSat;
+uniform vec4 uDrops[18];
+float hn(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(hn(i), hn(i + vec2(1, 0)), f.x), mix(hn(i + vec2(0, 1)), hn(i + 1.), f.x), f.y); }
 float h(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 vec3 filmic(vec3 x) { return clamp((x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14), 0., 1.); }
 float coc(vec2 uv) { vec4 v = texture(uVel, uv); if (v.w < .5) return 0.; float z = v.z * 10.; return clamp(abs(1. - uFocus / max(z, .1)) * uAperture, 0., 14.); }
@@ -285,11 +316,30 @@ void main() {
     col = s / n;
   }
   col /= uEnc;
+  // drops left on the glass: soft lenses, out of focus, each showing the sky through it upside down
+  float asp = uRes.x / uRes.y;
+  for (int i = 0; i < 18; i++) {
+    vec4 d = uDrops[i];
+    if (d.z <= 0.) continue;
+    vec2 q = (uv - d.xy) * vec2(asp, 1.);
+    q.y *= 1. + .25 * step(q.y, 0.);                         // a little fuller at the bottom, where the water gathers
+    float r = d.z, l = length(q) / r;
+    if (l > 1.25) continue;
+    float m = smoothstep(1.25, .45, l) * d.w;
+    vec2 back = d.xy - q / vec2(asp, 1.) * .55;
+    vec3 seen = textureLod(uCol, back, 2.5).rgb / uEnc * 1.07;
+    seen *= 1. + .12 * smoothstep(.5, 1., l) * step(0., -q.y);
+    col = mix(col, seen, m);
+  }
+  // the glass frosted at its edges, as on the landing
+  float fe = smoothstep(.55, .9, length((uv - .5) * vec2(1.25, 1.)) + (vn(uv * vec2(7., 5.)) - .5) * .12);
+  col = mix(col, textureLod(uCol, uv, 4.5).rgb / uEnc * 1.08 + .015, fe * .3);
   vec3 bl = max(textureLod(uCol, uv, 3.).rgb / uEnc - .85, 0.) * .45 + max(textureLod(uCol, uv, 5.).rgb / uEnc - .6, 0.) * .35;
   col += bl * uBloom;
   float l = dot(col, vec3(.2126, .7152, .0722));
   col = mix(vec3(l), col, uSat);
-  col *= 1. - .32 * smoothstep(.55, 1.05, uv.y);
+  col *= 1. - .22 * smoothstep(.55, 1.05, uv.y);
+  col *= vec3(.97, 1., 1.04);
   col = filmic(col * 1.08);
   vec2 c = uv - .5;
   col *= 1. - uVig * pow(length(c * vec2(1.05, 1.)), 2.4);
@@ -407,6 +457,7 @@ void main() {
       this.mx = 0; this.my = 0; this.cmx = 0; this.cmy = 0; this.hover = -1; this.fade = 1;
       this.active = false; this.t0 = performance.now(); this.scale = 1; this.ema = 16; this.slow = 0;
       this.wind = { v: 0, gust: 0, next: 4, t: 0 };
+      this.drops = Array.from({ length: 18 }, (_, i) => (i < 7 ? this.newDrop(true) : { x: 0, y: -1, r: 0, a: 0, v: 0, hold: 1e9 }));
       // the cord's own bounce: a vibrating string sampled across the view, up-down and to-and-fro
       this.RN = 120; this.ry = new Float32Array(this.RN); this.rvy = new Float32Array(this.RN); this.rz = new Float32Array(this.RN); this.rvz = new Float32Array(this.RN);
       let x = 0; const GAP = 0.36;
@@ -419,7 +470,7 @@ void main() {
         return p;
       });
       this.sky = null;
-      if (opts.sky) this.loadSky(opts.sky);
+      if (opts.wood) { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => { this.wood = this.tex(im); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT); if (!this.active) this.draw(performance.now()); }; im.src = opts.wood; }
       this.size();
       this.layoutSheets(true);
       this.ro = new ResizeObserver(() => { this.size(); });
@@ -551,6 +602,13 @@ void main() {
       if (!this.active) this.draw(performance.now());
     }
 
+    newDrop(any) {
+      const big = rnd() < 0.4, r = (big ? 0.04 + rnd() * 0.035 : 0.02 + rnd() * 0.02);
+      // they keep to the edges and the corners, where the frost is, and leave the middle clear
+      let x = rnd(), y = rnd();
+      if (any && Math.abs(x - 0.5) < 0.3 && Math.abs(y - 0.5) < 0.3) x = x < 0.5 ? x * 0.4 : 1 - (1 - x) * 0.4;
+      return { x, y, r, a: 0.6 + rnd() * 0.3, v: 0, hold: 6 + rnd() * 40 };
+    }
     // ---------- the cord ----------
     get k() { return this.aspect < 0.9 ? Math.min(1.05, 0.5 + this.aspect * 0.62) : 1; }
     span() { return this.aspect * 1.75 + 0.8; }
@@ -651,6 +709,13 @@ void main() {
         }
         for (let i = 1; i < RN - 1; i++) { this.ry[i] += this.rvy[i] * d; this.rz[i] += this.rvz[i] * d; }
       }
+      // the drops on the glass: most stay; now and then one grows heavy and runs
+      for (let i = 0; i < this.drops.length; i++) {
+        const d = this.drops[i];
+        d.hold -= dt;
+        if (d.hold < 0 && d.r > 0.02 && !R) { d.v += (0.03 - d.v) * dt * 2; d.y -= d.v * dt; d.r *= 1 - dt * 0.02; }
+        if (d.r > 0 && d.y < -0.1) this.drops[i] = Object.assign(this.newDrop(false), { y: 1.05 + rnd() * 0.2 });
+      }
       // the paper: two substeps a frame
       for (const p of this.P) {
         const cx = p.at * this.k - this.off, near = Math.abs(cx) < this.aspect * 2.2 + 1;
@@ -681,7 +746,7 @@ void main() {
         gl.uniform3fv(pr.u.uEye, eye); gl.uniform1f(pr.u.uSkyOk, this.sky ? 1 : 0);
         const ar = this.skyAR || 1.5, s = ar > this.aspect ? [this.aspect / ar, 1] : [1, ar / this.aspect];
         gl.uniform2f(pr.u.uSkyFit, s[0] * 0.86, s[1] * 0.86); gl.uniform2f(pr.u.uSkyOff, 0, 0.04);
-        gl.uniform1i(pr.u.uSky, 1);
+        gl.uniform1i(pr.u.uSky, 1); if (pr.u.uST) gl.uniform1f(pr.u.uST, (performance.now() - this.t0) / 1000);
         if (pr.u.uVP) gl.uniformMatrix4fv(pr.u.uVP, false, VP);
         if (pr.u.uPVP) gl.uniformMatrix4fv(pr.u.uPVP, false, PVP);
         if (pr.u.uEnc) gl.uniform1f(pr.u.uEnc, this.enc);
@@ -736,7 +801,7 @@ void main() {
           const top = s.x.subarray(col * 3, col * 3 + 3), below = s.x.subarray((2 * NX + col) * 3, (2 * NX + col) * 3 + 3);
           const tilt = Math.atan2(below[2] - top[2], top[1] - below[1]) * 0.8;
           const slope = Math.atan(2 * W0.sag * P0[0]) * 0.5, yaw = Math.atan(-2 * W0.depth * P0[0]);
-          const kk = p.k || 1, C = [P0[0], P0[1] + (W0.pegDrop + 0.06) * kk, P0[2]];
+          const kk = (p.k || 1) * W0.pegSize, C = [P0[0], P0[1] + W0.pegDrop * (p.k || 1) + 0.06 * kk, P0[2]];
           const Mw = M.mul(M.T(...C), M.mul(M.Y(yaw), M.mul(M.X(-tilt), M.mul(M.Z(slope), M.S(kk)))));
           pegs.push({ M: Mw, key: p.i * 2 + pg.length / 4, seed: p.seed + pg.length });
           pg.push(C[0], C[1] + 0.12 * kk, C[0], C[1] - 0.17 * kk);
@@ -750,12 +815,14 @@ void main() {
       }
       // the pegs
       pr = this.pPeg; gl.useProgram(pr); common(pr);
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.wood || null); gl.activeTexture(gl.TEXTURE0);
       const half = [0.034, 0.185, 0.032]; gl.uniform3fv(pr.u.uHalf, half);
       gl.bindVertexArray(this.vBox);
       this.pegPrev = this.pegPrev || {};
       for (const g of pegs) {
         gl.uniformMatrix4fv(pr.u.uM, false, g.M); gl.uniformMatrix4fv(pr.u.uPM, false, this.pegPrev[g.key] || g.M);
         gl.uniform3fv(pr.u.uCamO, M.xf(M.inv(g.M), eye)); gl.uniform1f(pr.u.uSeed, g.seed);
+        gl.uniform1i(pr.u.uWood, 2); gl.uniform1f(pr.u.uWoodOk, this.wood ? 1 : 0);
         gl.drawArrays(gl.TRIANGLES, 0, 36);
         this.pegPrev[g.key] = g.M;
       }
@@ -776,6 +843,9 @@ void main() {
       gl.uniform1f(pr.u.uFocus, Math.hypot(eye[0], eye[1] - W0.lineY * 0.3, eye[2])); gl.uniform1f(pr.u.uAperture, (this.H / 900) * 70);
       gl.uniform1f(pr.u.uEnc, this.enc); gl.uniform1f(pr.u.uGrain, 0.055); gl.uniform1f(pr.u.uBloom, 0.8); gl.uniform1f(pr.u.uVig, 0.55); gl.uniform1f(pr.u.uSat, 1.06);
       gl.uniform1f(pr.u.uFade, this.reduce ? 1 : this.fade);
+      const DU = this.dropU || (this.dropU = new Float32Array(18 * 4));
+      this.drops.forEach((d, i) => { DU[i * 4] = d.x; DU[i * 4 + 1] = d.y; DU[i * 4 + 2] = d.r; DU[i * 4 + 3] = d.a; });
+      gl.uniform4fv(pr.u.uDrops, DU);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindVertexArray(null);
     }

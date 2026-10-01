@@ -688,7 +688,7 @@
     const none = { enter() {}, key() {}, still() {}, rect() { return null; }, tick() {} };
     if (!sec) return none;
     const c = $(".cord__gl", sec), items = JSON.parse($(".cord__data", sec).textContent), N = items.length;
-    const dr = window.Clothesline && Clothesline.supported ? new Clothesline(c, items, { reduce, sky: c.dataset.sky }) : null;
+    const dr = window.Clothesline && Clothesline.supported ? new Clothesline(c, items, { reduce, wood: c.dataset.wood }) : null;
     if (!dr || !dr.ok) { sec.classList.add("no-gl"); return none; }
     if (/[?&]test(&|$)/.test(location.search)) window.__cl = dr;
     const label = $(".cord__label", sec), open = $(".cord__open", sec), openRoll = $(".btn__roll", open);

@@ -225,7 +225,7 @@ html:not([data-mode="focus"]) .voice { opacity: 0; }
 /* one still view of the sky; the scroll only pulls the cord, so the section is as tall as the cord is long */
 .page--work { --bg: #0b0d0c; }
 .cord { position: relative; height: calc(100svh + (var(--n) - 1) * 62svh); }
-.cord__stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #6d7f8a; color: #f2f3ec; }
+.cord__stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: #5b93d4; color: #f2f3ec; }
 .cord__gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
 .cord.is-drag .cord__gl { cursor: grabbing; }
 .cord.is-over .cord__gl { cursor: pointer; }
