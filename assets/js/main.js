@@ -721,20 +721,29 @@
     };
     const nameOf = (o) => o.name || (others.size > 1 ? `${T.someone} ${o.slot + 1}` : T.someone);
 
-    // ---- a person on screen: the pointer, and one card beside it (the name; the words open under it when they write) ----
-    const layerIn = (host) => { if (!host) return null; let l = host.querySelector(":scope > .peers"); if (!l) { l = d.createElement("div"); l.className = "peers"; l.setAttribute("aria-hidden", "true"); const c = host.querySelector(".hero__rain, .wall__glass"); c ? c.after(l) : host.prepend(l); } return l; };
+    // ---- a person, out there behind the glass: their pointer and one card beside it (the name; the words open under it).
+    //      Drawn here in 2D at the screen's resolution and handed to the glass, which looks at it through its frost and its
+    //      drops like at anything else out there: blurred where it is frosted, bent through the water, sharp where wiped ----
+    const P2D = Object.fromEntries(EMO.map((k) => [k, new Path2D(ICON[k])]));
+    const AR = new Path2D("M1.5 1.5v16.4l4.3-4.1 2.9 6.6 2.9-1.3-2.8-6.4h6.1z");
+    // each person is drawn into their own tile of a small atlas (the tip of the pointer at the tile's corner); the glass
+    // places the tiles where the people are, so moving costs nothing and only a change of what they show is sent up
+    const TW = 340, TH = 250, TP = 4;
+    const lc = d.createElement("canvas"), lx = lc.getContext("2d");
+    let LS = 1, drawn = false;
+    const sizeL = () => { LS = Math.min(devicePixelRatio || 1, 2); lc.width = Math.round(TW * 4 * LS); lc.height = Math.round(TH * LS); lastKey = ""; };
+    const TILE = new Float32Array(16);
+    const F = { name: "500 10.5px 'Chivo Mono', monospace", text: "500 14.5px 'Inter Tight', sans-serif" };
+    const wrapT = (text, max) => { lx.font = F.text; const out = []; let line = ""; for (const w of text.split(" ")) { const t = line ? line + " " + w : w; if (lx.measureText(t).width > max && line) { out.push(line); line = w; } else line = t; } if (line) out.push(line); return out.slice(0, 6); };
     const get = (id) => {
       if (others.has(id)) return others.get(id);
       const used = new Set([...others.values()].map((o) => o.slot)), slot = [0, 1, 2, 3, 4, 5].find((i) => !used.has(i));
-      const el = d.createElement("div"); el.className = "peer";
-      el.innerHTML = `${ARROW}<div class="card"><div class="card__who"><span class="card__name"></span><span class="card__dots"><i></i><i></i><i></i></span></div><div class="card__msg"><div class="card__t"></div></div></div>`;
-      const o = { id, slot, el, card: el.querySelector(".card"), name: "", m: null, x: -999, y: -999, tx: -999, ty: -999, seen: 0, last: performance.now(), voice: voiceOf(id), say: null, fz: 1, fp: 1, sampled: 0, stack: 0 };
+      const o = { id, slot, name: "", m: null, x: -999, y: -999, tx: -999, ty: -999, seen: 0, last: performance.now(), voice: voiceOf(id), say: null, stack: 0, cw: 0, ch: 0, press: 0 };
       others.set(id, o);
-      paint(o);
       return o;
     };
-    function paint(o) { const n = o.el.querySelector(".card__name"), nm = nameOf(o).toUpperCase(); if (n.textContent !== nm) resize(o.card, () => (n.textContent = nm)); }
-    // a card changes size by gliding from what it was to what it becomes
+    const paint = () => {};
+    // my card changes size by gliding from what it was to what it becomes
     function resize(card, change) {
       const w0 = card.offsetWidth, h0 = card.offsetHeight;
       change();
@@ -744,37 +753,89 @@
       gsap.killTweensOf(card, "width,height");
       gsap.fromTo(card, { width: w0, height: h0 }, { width: w1, height: h1, duration: 0.55, ease: "expo.out", clearProps: "width,height" });
     }
-    // their words open under their name, typed in at the pace of their voice; after a while the card closes again
-    function hear(o, text, icon) {
-      const t = o.el.querySelector(".card__t"), n = icon ? 0 : text.length;
-      if (o.say) { if (o.say.tw) o.say.tw.kill(); if (o.say.end) o.say.end.kill(); }
-      o.say = {};
-      resize(o.card, () => {
-        o.el.classList.add("is-talking"); o.el.classList.remove("is-typing");
-        if (icon) t.innerHTML = svg(icon);
-        else { t.textContent = text; }
-      });
-      if (icon) { if (!reduce) gsap.fromTo(t.firstChild, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2)", delay: 0.1 }); }
-      else if (!reduce) {
-        // the card has its final size already; the letters arrive inside it
-        const oo = { n: 0 }; t.textContent = "";
-        o.say.tw = gsap.to(oo, { n, duration: durOf(n), ease: "none", delay: 0.12, onUpdate: () => (t.textContent = text.slice(0, Math.round(oo.n))) });
-      }
-      o.say.end = gsap.delayedCall((icon ? 7000 : holdOf(n) + durOf(n) * 1000) / 1000, () => { resize(o.card, () => { o.el.classList.remove("is-talking"); t.textContent = ""; }); o.say = null; });
+    // what their card should be right now: its size and what is in it
+    function layout(o, now) {
+      lx.font = F.name;
+      const name = nameOf(o).toUpperCase(), nw = lx.measureText(name).width, s = o.say;
+      if (!s) { const typingW = o.m && o.m.w ? 22 : 0; return { w: nw + 16 + typingW, h: 22, name, lines: null }; }
+      if (s.icon) return { w: Math.max(nw + 20, 48), h: 26 + 28 + 10, name, icon: s.icon };
+      const lines = s.lines || (s.lines = wrapT(s.text, 268)); lx.font = F.text;
+      return { w: Math.max(nw + 20, Math.max(...lines.map((l) => lx.measureText(l).width)) + 20), h: 26 + lines.length * 19 + 10, name, lines };
     }
-    function knockFx(x, y, word) {
+    let lastDraw = 0, lastKey = "";
+    sizeL(); addEventListener("resize", sizeL);
+    function draw(now, g) {
+      const vis = [...others.values()].filter((o) => o.seen > 0.01 && o.slot < 4);
+      // where the tiles go: every frame, as a uniform
+      TILE.fill(0);
+      for (const o of vis) { const i = o.slot * 4; TILE[i] = (o.x - TP) / innerWidth; TILE[i + 1] = (o.y - TP) / innerHeight; TILE[i + 2] = TW / innerWidth; TILE[i + 3] = TH / innerHeight; }
+      if (g) g.tiles(TILE, LS * innerWidth / Math.max(1, g.c.width));
+      // what is in them: only redrawn when it changes
+      const key = vis.map((o) => [o.slot, Math.round(o.stack), Math.round(o.cw), Math.round(o.ch), (o.seen * 20) | 0, o.press > 0.5 ? 1 : 0, o.say ? (o.say.at | 0) + ":" + Math.ceil(Math.min(1, (now - o.say.at) / 350) * 10) + ":" + Math.ceil(Math.min(1, Math.max(0, now - o.say.at - 120) / (o.say.dur * 1000)) * o.say.text.length) : 0, o.m && o.m.w ? ((now / 180) | 0) : 0, o.name].join(",")).join("|");
+      if (!vis.length || !g) { if (drawn) { for (const r of [hero.rain, wall && wall.rain]) if (r) r.layer(lc, false); drawn = false; lastKey = ""; } return; }
+      for (const r of [hero.rain, wall && wall.rain]) if (r && r !== g) r.layer(lc, false);
+      if (key === lastKey && drawn) return;
+      if (now - lastDraw < 30 && drawn) return;
+      lastKey = key; lastDraw = now;
+      lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, lc.width, lc.height);
+      for (const o of vis) {
+        const L = layout(o, now), k = reduce ? 1 : 0.22;
+        o.cw += (L.w - o.cw) * (o.cw ? k : 1); o.ch += (L.h - o.ch) * (o.ch ? k : 1);
+        lx.setTransform(LS, 0, 0, LS, o.slot * TW * LS, 0);
+        lx.save(); lx.beginPath(); lx.rect(0, 0, TW, TH); lx.clip();
+        const x = TP, y = TP, cx = Math.round(x + 12), cy = Math.round(y + 16 + Math.min(o.stack, TH - o.ch - 24));
+        lx.globalAlpha = o.seen;
+        lx.save(); lx.translate(x, y); const pk = 1 - 0.16 * o.press; lx.scale(pk, pk);
+        lx.fillStyle = "#f6f7f2"; lx.strokeStyle = "rgba(12,15,18,0.9)"; lx.lineWidth = 1.15; lx.lineJoin = "round"; lx.fill(AR); lx.stroke(AR); lx.restore();
+        lx.fillStyle = "rgba(12,16,13,0.72)"; lx.fillRect(cx, cy, o.cw, o.ch);
+        lx.strokeStyle = "rgba(244,245,239,0.14)"; lx.lineWidth = 1; lx.strokeRect(cx + 0.5, cy + 0.5, o.cw - 1, o.ch - 1);
+        lx.save(); lx.beginPath(); lx.rect(cx, cy, o.cw, o.ch); lx.clip();
+        const talking = !!o.say, pad = talking ? 10 : 8;
+        lx.font = F.name; lx.textBaseline = "middle"; lx.fillStyle = talking ? "rgba(244,245,239,0.6)" : "#f4f5ef";
+        lx.fillText(L.name, cx + pad, cy + (talking ? 13.5 : 11.5));
+        if (!talking && o.m && o.m.w) { const dx = cx + pad + lx.measureText(L.name).width + 8; for (let i = 0; i < 3; i++) { const a = 0.3 + 0.7 * Math.max(0, Math.sin(now / 180 - i * 0.9)); lx.fillStyle = `rgba(244,245,239,${a.toFixed(2)})`; lx.fillRect(dx + i * 6, cy + 10, 3, 3); } }
+        if (talking && L.icon) {
+          const e = Math.min(1, (now - o.say.at) / 350), s = 28 * (0.6 + 0.4 * (1 - Math.pow(1 - e, 3)));
+          lx.save(); lx.translate(cx + 10 + 14, cy + 26 + 14); lx.scale(s / 256, s / 256); lx.translate(-128, -128); lx.fillStyle = "#f4f5ef"; lx.fill(P2D[L.icon]); lx.restore();
+        } else if (talking && L.lines) {
+          const shown = Math.ceil(Math.min(1, Math.max(0, now - o.say.at - 120) / (o.say.dur * 1000)) * o.say.text.length);
+          lx.font = F.text; lx.textBaseline = "top"; lx.fillStyle = "#f4f5ef";
+          let left = shown;
+          L.lines.forEach((l, i) => { const part = l.slice(0, Math.max(0, left)); left -= l.length + 1; if (part) lx.fillText(part, cx + 10, cy + 26 + i * 19); });
+        }
+        lx.restore(); lx.restore();
+      }
+      lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalAlpha = 1;
+      g.layer(lc, true); drawn = true;
+    }
+    // their words open under their name, at the pace of their voice; after a while the card closes again
+    function hear(o, text, icon) {
+      const n = icon ? 0 : text.length;
+      o.say = { text, icon, at: performance.now(), dur: durOf(n), hold: icon ? 7000 : holdOf(n) + durOf(n) * 1000 };
+    }
+    function knockFx(x, y) {
       if (reduce) return;
-      const box = d.createElement("div"); box.className = "knock"; box.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      box.innerHTML = (word ? `<b>${T.toc}</b>` : "") + "<s></s>" + Array.from({ length: 9 }, () => "<i></i>").join("");
-      d.body.appendChild(box);
+      const NS = "http://www.w3.org/2000/svg", S = 260, box = d.createElementNS(NS, "svg");
+      box.setAttribute("class", "knock"); box.setAttribute("viewBox", `${-S / 2} ${-S / 2} ${S} ${S}`); box.setAttribute("width", S); box.setAttribute("height", S);
+      box.style.transform = `translate3d(${x - S / 2}px, ${y - S / 2}px, 0)`;
+      const el = (n, a) => { const e = d.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); box.appendChild(e); return e; };
       const tl = gsap.timeline({ onComplete: () => box.remove() });
-      box.querySelectorAll("i").forEach((i, n) => {
-        const a = (n / 9) * 360 + (Math.random() - 0.5) * 16, r0 = 16 + Math.random() * 6, r1 = 46 + Math.random() * 26, len = 10 + Math.random() * 12, ra = (a * Math.PI) / 180;
-        tl.fromTo(i, { rotation: a, x: Math.cos(ra) * r0, y: Math.sin(ra) * r0, scaleX: len / 18, opacity: 1 }, { x: Math.cos(ra) * r1, y: Math.sin(ra) * r1, scaleX: 0.15, opacity: 0, duration: 0.55, ease: "expo.out" }, 0);
+      // two knuckles, two sets of rings: thin, broken circles that open out and fade
+      [0, 0.17].forEach((t0, h) => {
+        for (let r = 0; r < 3; r++) {
+          const c = el("circle", { cx: 0, cy: 0, r: 6, fill: "none", stroke: "#f6f7f2", "stroke-width": 1.4, "stroke-dasharray": r === 1 ? "2 5" : r === 2 ? "1 9" : "none", "stroke-linecap": "round" });
+          tl.fromTo(c, { attr: { r: 6 + r * 3 }, opacity: 0.95 - r * 0.2 }, { attr: { r: 34 + r * 22 + h * 6, "stroke-width": 0.5 }, opacity: 0, duration: 0.7 + r * 0.12, ease: "expo.out" }, t0 + r * 0.045);
+        }
       });
-      tl.fromTo(box.querySelector("s"), { scale: 0.4, opacity: 1 }, { scale: 4.2, opacity: 0, duration: 0.7, ease: "expo.out" }, 0);
-      const b = box.querySelector("b");
-      if (b) tl.fromTo(b, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out" }, 0).to(b, { opacity: 0, duration: 0.5, ease: "power2.in" }, 1.1);
+      // shards of frost: tiny clean slivers that spring off, turn, and drop away
+      for (let i = 0; i < 12; i++) {
+        const a = Math.random() * Math.PI * 2, v = 30 + Math.random() * 45, len = 3 + Math.random() * 5, w = 1 + Math.random() * 1.2;
+        const sh = el("polygon", { points: `0,${-len / 2} ${w},0 0,${len / 2} ${-w},0`, fill: "#f6f7f2", opacity: 0.9 });
+        const dx = Math.cos(a) * v, dy = Math.sin(a) * v - 18;
+        tl.fromTo(sh, { x: Math.cos(a) * 8, y: Math.sin(a) * 8, rotation: (a * 180) / Math.PI, opacity: 0.95, svgOrigin: "0 0" },
+          { keyframes: { x: [Math.cos(a) * 8, dx * 0.8, dx], y: [Math.sin(a) * 8, dy * 0.75, dy + 70 + Math.random() * 40], easeEach: "power1.out" }, rotation: "+=" + (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * 200), opacity: 0, duration: 0.95 + Math.random() * 0.4, ease: "none" }, Math.random() * 0.08 + (i % 2) * 0.17);
+      }
+      d.body.appendChild(box);
     }
     // glass shivers: a few stiff, quick, small movements that die at once (never a wobble)
     const shiver = (el, k = 1) => {
@@ -786,7 +847,7 @@
     };
     function knockHere(p, sx, sy, k = 1, word) {
       const g = glassOf(p); if (!g) return;
-      knockFx(sx * innerWidth, sy * innerHeight, word);
+      knockFx(sx * innerWidth, sy * innerHeight);
       g.knock(sx, sy, k);
       shiver(hostOf(p), k);
       if (window.Sound) Sound.knock(sx * 2 - 1, k);
@@ -800,7 +861,7 @@
         gsap.delayedCall(1.4, () => { const o = others.get(id); if (o && !o.told) { o.told = true; tell(T.join(nameOf(o)), 5); if (!toldHint) { toldHint = true; gsap.delayedCall(6, () => others.size && tell(T.hint, 6)); } } });
       },
       leave(id) { const o = others.get(id); if (!o) return; o.gone = true; tell(T.leave(nameOf(o)), 4); },
-      name(id, n) { const o = get(id); o.name = String(n).replace(/[<>]/g, "").trim().slice(0, 18); paint(o); },
+      name(id, n) { const o = get(id); o.name = String(n).replace(/[<>]/g, "").trim().slice(0, 18); },
       // the hour of the window: the one who has been here longest keeps it; the others glide to it
       clock(id, c) {
         if (!c || typeof c.h !== "number" || typeof c.born !== "number" || c.born >= CLOCK.born) return;
@@ -823,7 +884,7 @@
         if (m.p) { o.m = { ...(o.m || {}), p: m.p, x: m.x, y: m.y }; o.last = performance.now(); }
         hear(o, t, icon);
         if (window.Sound && Sound.on) { if (icon) { if (Sound.typeKeys) Sound.typeKeys(2, 0.1); } else Sound.voice(t, durOf(t.length), { ...o.voice, x: a ? (a.x / innerWidth) * 2 - 1 : 0 }); }
-        if (!toldWrote && a) { toldWrote = true; gsap.delayedCall(durOf(t.length) + 0.6, () => { if (o.fp > 0.45) tell(T.wrote(nameOf(o)), 6); }); }
+        if (!toldWrote && a) { toldWrote = true; gsap.delayedCall(durOf(t.length) + 0.6, () => { const g = glassOf(place()); if (g && g.fogAt((o.x + 80) / innerWidth, (o.y + 40) / innerHeight) > 0.45) tell(T.wrote(nameOf(o)), 6); }); }
       },
       knock(id, m) {
         const o = get(id), a = dec(m); if (!a) return;
@@ -843,50 +904,38 @@
     setInterval(sendNow, 2000);
     setInterval(() => { if (share && share.count) share.clock({ h: CLOCK.h, born: CLOCK.born }); }, 8000);
     gsap.ticker.add(() => {
-      const now = performance.now(), p = place(), g = glassOf(p), layer = layerIn(hostOf(p));
+      const now = performance.now(), p = place(), g = glassOf(p);
       // a finger held still on the glass breathes on it
       if (g && g.finger && now - still.t > 650) {
         g.breathe(me.x / innerWidth, me.y / innerHeight, 0.05);
         if ((!breathing || now - breathing > 1000) && window.Sound) { Sound.breath((me.x / innerWidth) * 2 - 1, breathing ? 0.8 : 1); breathing = now; }
         if (share && share.count && now - still.sent > 140) { still.sent = now; share.breath(enc(me.x, me.y)); }
       } else breathing = 0;
-      if (!others.size) return;
+      if (!others.size) { draw(now, null); return; }
       for (const [id, o] of others) {
         const pos = o.gone || now - o.last > 30000 ? null : dec(o.m);
-        if (layer && o.el.parentNode !== layer) layer.appendChild(o.el);
-        o.seen += ((pos ? 1 : 0) - o.seen) * 0.12;
+        o.seen += ((pos && g ? 1 : 0) - o.seen) * 0.12;
         if (pos) { if (o.tx < -900) { o.x = pos.x; o.y = pos.y; } o.tx = pos.x; o.ty = pos.y; }
         o.x += (o.tx - o.x) * 0.3; o.y += (o.ty - o.y) * 0.3;
-        o.el.style.transform = `translate3d(${o.x.toFixed(1)}px, ${o.y.toFixed(1)}px, 0)`;
-        o.el.style.opacity = (layer ? o.seen : 0).toFixed(3);
-        o.el.classList.toggle("is-down", !!(o.m && o.m.d));
-        o.el.classList.toggle("is-typing", !!(o.m && o.m.w) && !o.el.classList.contains("is-talking"));
-        // how much frost is between us, under their pointer and under their card: that is how blurred they look
-        if (g && pos && now - o.sampled > 90) {
-          o.sampled = now;
-          const cw = o.card.offsetWidth || 80, ch = o.card.offsetHeight || 24, cx = o.x + 12 + cw / 2, cy = o.y + 16 + o.stack + ch / 2;
-          const fz = g.fogAt(o.x / innerWidth, o.y / innerHeight), fp = Math.max(g.fogAt((cx - cw * 0.25) / innerWidth, cy / innerHeight), g.fogAt((cx + cw * 0.25) / innerWidth, cy / innerHeight));
-          const q = (v) => Math.round(v * 20) / 20;
-          if (q(fz) !== o.fz) { o.fz = q(fz); o.el.style.setProperty("--fz", o.fz); }
-          if (q(fp) !== o.fp) { o.fp = q(fp); o.el.style.setProperty("--fp", o.fp); }
-        }
+        o.press += ((o.m && o.m.d ? 1 : 0) - o.press) * 0.3;
+        if (o.say && now - o.say.at > o.say.hold) o.say = null;
         // the same spot, at the same time, from both sides
         if (pos && g && g.finger && o.m && o.m.d && Math.hypot(o.x - me.x, o.y - me.y) < 46 && now - (o.touched || 0) > 6000) {
           o.touched = now; g.warm(me.x / innerWidth, me.y / innerHeight); if (window.Sound) Sound.chime((me.x / innerWidth) * 2 - 1);
         }
-        if (o.gone && o.seen < 0.01) { o.el.remove(); others.delete(id); }
+        if (o.gone && o.seen < 0.01) others.delete(id);
       }
       // cards close to each other stack downwards instead of covering each other
       const list = [...others.values()].filter((o) => o.seen > 0.05).sort((a, b) => a.y - b.y);
       for (let i = 0; i < list.length; i++) {
         const o = list[i]; let push = 0;
         for (let j = 0; j < i; j++) {
-          const p = list[j], pw = p.card.offsetWidth, ph = p.card.offsetHeight + 6;
-          const ox = o.x + 12, oy = o.y + 16 + push, px2 = p.x + 12, py2 = p.y + 16 + p.stack;
-          if (ox < px2 + pw && ox + o.card.offsetWidth > px2 && oy < py2 + ph && oy + o.card.offsetHeight > py2) push = py2 + ph - (o.y + 16);
+          const p = list[j], ox = o.x + 12, oy = o.y + 16 + push, px2 = p.x + 12, py2 = p.y + 16 + p.stack;
+          if (ox < px2 + p.cw && ox + o.cw > px2 && oy < py2 + p.ch + 6 && oy + o.ch > py2) push = py2 + p.ch + 6 - (o.y + 16);
         }
-        if (Math.abs(push - o.stack) > 0.5) { o.stack += (push - o.stack) * 0.25; o.card.style.transform = `translateY(${o.stack.toFixed(1)}px)`; }
+        o.stack += (push - o.stack) * 0.25;
       }
+      draw(now, g);
     });
 
     // ---- knocking: two quick presses in the same place, with a mouse or a finger ----

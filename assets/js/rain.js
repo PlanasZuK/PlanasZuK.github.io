@@ -156,7 +156,6 @@ void main() {
         col = mix(col, col * .35, smoothstep(.012, .002, dd) * (1. - uNight) * .8);
       }
     }
-    vec4 pl = texture(uPL, vec2(uv.x, 1. - uv.y)); col = mix(col, pl.rgb * mix(1., .55, uNight), pl.a);
     o = vec4(col, 1.);
     return;
   }
@@ -198,14 +197,26 @@ void main() {
   col += uFlash * vec3(.5, .55, .68);
   // birds: dark against the day, gone by night
   col = mix(col, col * .28, birds(uv) * uSky * (1. - uNight) * .85);
-  vec4 pl = texture(uPL, vec2(uv.x, 1. - uv.y)); col = mix(col, pl.rgb * mix(1., .55, uNight), pl.a);
   o = vec4(col, 1.);
 }`;
 
   const GLASS = `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 o;
-uniform sampler2D uScene, uWater, uFog, uGrease;
+uniform sampler2D uScene, uWater, uFog, uGrease, uPL;
+uniform float uLodL, uPLOn; uniform vec4 uTiles[4];
+// the people: tile i of the atlas, placed at uTiles[i] (left, top, width, height in the view, y down)
+vec4 people(vec2 uv, float lod) {
+  vec2 q = vec2(uv.x, 1. - uv.y); vec4 acc = vec4(0.);
+  for (int i = 0; i < 4; i++) {
+    vec4 t = uTiles[i]; if (t.z <= 0.) continue;
+    vec2 l = (q - t.xy) / t.zw;
+    if (l.x < -.02 || l.y < -.02 || l.x > 1.02 || l.y > 1.02) continue;
+    vec4 c = textureLod(uPL, vec2((float(i) + clamp(l.x, .002, .998)) / 4., clamp(l.y, .002, .998)), max(lod + uLodL, 0.));
+    acc = c + acc * (1. - c.a);
+  }
+  return acc;
+}
 uniform vec2 uRes;
 uniform float uTime, uExpo, uNight, uFlash, uLod, uFR;
 uniform vec4 uKnock, uWarm;
@@ -215,7 +226,13 @@ uniform vec4 uPeer[4]; // other people at this glass: where their fingertip is (
 ${decl(GLASS_U)}
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 // the scene is rendered at the photograph's own resolution, so its levels are shifted to match the screen's
-vec3 S(vec2 uv, float lod) { return textureLod(uScene, uv, max(lod + uLod, 0.)).rgb; }
+// what is out there: the scene, and in front of it (still behind the glass) the people, drawn at the screen's own
+// resolution and premultiplied, so the frost blurs them exactly as it blurs everything else
+vec3 S(vec2 uv, float lod) {
+  vec3 c = textureLod(uScene, uv, max(lod + uLod, 0.)).rgb;
+  if (uPLOn > .5) { vec4 l = people(uv, lod); c = c * (1. - l.a) + l.rgb * mix(1., .6, uNight); }
+  return c;
+}
 float micro(vec2 px) {
   vec2 c = px / 2.8, i = floor(c), f = fract(c);
   vec2 p = vec2(hash(i), hash(i + 5.1)) * .6 + .2;
@@ -241,6 +258,8 @@ void main() {
   if (fa < 1.) {
     vec2 ca = (uv - .5) * k_ca;
     clear = vec3(S(uv + ca, k_clearBlur).r, S(uv, k_clearBlur).g, S(uv - ca, k_clearBlur).b);
+    // the people close behind the pane are in focus through clear glass: no colour fringing on them
+    if (uPLOn > .5) { float la = people(uv, 0.).a; if (la > 0.) clear = mix(clear, S(uv, 0.), la); }
     clear = clear * 1.07 + .016;
   }
   if (fa > 0.) {
@@ -352,7 +371,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       if (!gl) { this.dead = true; return; }
       this.gl = gl;
       this.pScene = this.program(SCENE, ["uImg", "uMask", "uRes", "uImgSize", "uPar", "uRoot", "uTime", "uWind", "uStem", "uSun", "uRain", "uNight", "uStorm", "uFlash", "uSat", "uBright", "uContrast", "uTint", "uLift", "uGlow", "uSegA", "uSegB", "uAng", "uSky", "uFlock", "uRig", "uPL", "uSwoop", ...SCENE_U.map((k) => "k_" + k)]);
-      this.pGlass = this.program(GLASS, ["uScene", "uWater", "uFog", "uGrease", "uRes", "uTime", "uExpo", "uNight", "uFlash", "uLod", "uPeer", "uFR", "uKnock", "uWarm", "uRects", "uRectN", ...GLASS_U.map((k) => "k_" + k)]);
+      this.pGlass = this.program(GLASS, ["uScene", "uWater", "uFog", "uGrease", "uRes", "uTime", "uExpo", "uNight", "uFlash", "uLod", "uPeer", "uFR", "uPL", "uLodL", "uPLOn", "uTiles", "uKnock", "uWarm", "uRects", "uRectN", ...GLASS_U.map((k) => "k_" + k)]);
       this.pDrop = this.program(DROPF, ["uSp", "uSize"], DROPV);
       const quad = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, quad);
@@ -373,7 +392,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       gl.bindVertexArray(null);
       this.inst = new Float32Array(6 * 1024);
       this.T = {};
-      for (const k of ["img", "mask", "water", "fog", "grease", "scene", "sp", "pl"]) this.T[k] = this.texture(["img", "scene"].includes(k));
+      for (const k of ["img", "mask", "water", "fog", "grease", "scene", "sp", "pl"]) this.T[k] = this.texture(["img", "scene", "pl"].includes(k));
       this.fbo = gl.createFramebuffer();
       this.wfbo = gl.createFramebuffer();
       this.imgSize = IMG.slice();
@@ -815,8 +834,6 @@ void main() { o = texture(uSp, vT) * vA; }`;
         if (this.o.rig && t > (this.nextSwoop || 25)) { this.swoop = [0, 0.35 + Math.random() * 0.35, t, Math.random() < 0.5 ? 1 : -1]; this.nextSwoop = t + 35 + Math.random() * 40; }
         if (t > this.nextFlock && this.o.birds !== false) { const dir = Math.random() < 0.5 ? 1 : -1, sc = this.c.width / this.c.height; this.flock = [dir > 0 ? -0.15 : 1.15 + 14 * 0.032 / sc, 0.45 + Math.random() * 0.35, t, dir]; this.nextFlock = t + (this.o.rig ? 14 + Math.random() * 18 : 38 + Math.random() * 50); }
       }
-      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.T.pl.t); gl.uniform1i(U.u.uPL, 2);
-      if (!this.plSet) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0])); this.plSet = true; }
       gl.uniform1f(U.u.uSky, this.o.sky ? 1 : 0); gl.uniform4fv(U.u.uFlock, this.flock); gl.uniform1f(U.u.uRig, this.o.rig ? 1 : 0); gl.uniform4fv(U.u.uSwoop, this.swoop || [0, 0, -9, 1]);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindTexture(gl.TEXTURE_2D, this.T.scene.t);
@@ -826,7 +843,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       U = this.pGlass;
       gl.useProgram(U.p);
       gl.uniform1f(U.u.uLod, this.lod);
-      [["uScene", "scene"], ["uWater", "water"], ["uFog", "fog"], ["uGrease", "grease"]].forEach(([u, k], i) => {
+      [["uScene", "scene"], ["uWater", "water"], ["uFog", "fog"], ["uGrease", "grease"], ["uPL", "pl"]].forEach(([u, k], i) => {
         gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.T[k].t); gl.uniform1i(U.u[u], i);
       });
       gl.uniform2f(U.u.uRes, this.c.width, this.c.height);
@@ -835,6 +852,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       gl.uniform1f(U.u.uNight, s.night);
       gl.uniform1f(U.u.uFlash, s.flash);
       for (const k of GLASS_U) gl.uniform1f(U.u["k_" + k], P[k]);
+      gl.uniform1f(U.u.uPLOn, this.plOn ? 1 : 0); gl.uniform1f(U.u.uLodL, Math.log2(this.plK || 1)); gl.uniform4fv(U.u.uTiles, this.tileU || new Float32Array(16));
       gl.uniform4fv(U.u.uPeer, this.peers); gl.uniform1f(U.u.uFR, this.fingerRadius() / this.H);
       gl.uniform1i(U.u.uRectN, this.rectN || 0); if (this.rectN) gl.uniform4fv(U.u.uRects, this.rectU);
       gl.uniform4fv(U.u.uKnock, this.knockU || [0, 0, -9, 0]); gl.uniform4fv(U.u.uWarm, this.warmU || [0, 0, -9, 0]);
@@ -867,7 +885,15 @@ void main() { o = texture(uSp, vT) * vA; }`;
       return (this.fx.getImageData(X, Y, 1, 1).data[0] / 255) * this.P.fog;
     }
     // the people behind the glass, drawn by whoever knows them (a 2D canvas), sent up when it changed
-    layer(canvas) { this.upload("pl", canvas, false); }
+    tiles(arr, k) { this.tileU = arr; this.plK = k; }
+    layer(canvas, on = true) {
+      this.plOn = on; if (!on) return;
+      const gl = this.gl; this.plW = canvas.width;
+      gl.bindTexture(gl.TEXTURE_2D, this.T.pl.t);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      this.upload("pl", canvas, false);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    }
     // the glass moved under the view (by css pixels): its drops and its frost move with it, fresh frost comes in
     pan(dx, dy) {
       if (this.dead) return;
