@@ -17,8 +17,8 @@
       fadeIn: [1.6, 0.3, 8, 0.1], windPush: [14, 0, 60, 1], cap: [520, 100, 2000, 10], size: [1, 0.4, 2.5, 0.05],
     },
     glass: {
-      fog: [1, 0, 1, 0.01], refog: [0.06, 0, 0.2, 0.002], frostBlur: [4.7, 0, 7, 0.1], frostLift: [0.06, 0, 0.3, 0.005], frostGlow: [0.1, 0, 0.4, 0.005],
-      frostDesat: [0.3, 0, 1, 0.01], micro: [0.022, 0, 0.1, 0.002], clearBlur: [0.65, 0, 4, 0.05], refract: [0.2, 0, 0.6, 0.01], rim: [0.22, 0, 1, 0.01],
+      fog: [1, 0, 1, 0.01], refog: [0.042, 0, 0.2, 0.002], frostBlur: [4.7, 0, 7, 0.1], frostLift: [0.06, 0, 0.3, 0.005], frostGlow: [0.1, 0, 0.4, 0.005],
+      frostDesat: [0.3, 0, 1, 0.01], micro: [0.022, 0, 0.1, 0.002], clearBlur: [0.25, 0, 4, 0.05], refract: [0.2, 0, 0.6, 0.01], rim: [0.22, 0, 1, 0.01],
       spec: [1.5, 0, 4, 0.05], specSharp: [50, 5, 300, 1], wipe: [14, 6, 40, 1], grease: [0.2, 0, 1, 0.01],
     },
     wind: {
@@ -59,9 +59,11 @@ void main() { vUv = p * .5 + .5; gl_Position = vec4(p, 0., 1.); }`;
   const SCENE = `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 o;
-uniform sampler2D uImg, uMask;
+uniform sampler2D uImg, uMask, uPL;
 uniform vec2 uRes, uImgSize, uPar, uRoot;
-uniform float uTime, uWind, uStem, uSun, uRain, uNight, uStorm, uFlash, uSat, uBright, uContrast;
+uniform float uTime, uWind, uStem, uSun, uRain, uNight, uStorm, uFlash, uSat, uBright, uContrast, uSky;
+uniform vec4 uFlock; // where a passing flock started (x, y), when (s), and which way (±1)
+uniform float uRig; uniform vec4 uSwoop;
 uniform vec3 uTint, uLift, uGlow;
 uniform vec4 uSegA[8], uSegB[8];
 uniform float uAng[8];
@@ -81,9 +83,85 @@ float streaks(vec2 uv, float cols, float speed, float seed, float lean) {
   float seg = fract(y), on = step(.66, hash(vec2(id, floor(y) + seed)));
   return on * exp(-pow((fract(x) - .5) * 3.2, 2.)) * smoothstep(0., .1, seg) * smoothstep(.55, .2, seg);
 }
+// a flock crossing the sky: a loose, uneven line of birds, each beating its wings at its own pace
+float birds(vec2 uv) {
+  if (uFlock.z <= 0.) return 0.;
+  float e = uTime - uFlock.z, sc = uRes.x / uRes.y, m = 0.;
+  vec2 p = vec2(uv.x * sc, uv.y);
+  for (int i = 0; i < 22; i++) {
+    float fi = float(i), h1 = hash(vec2(fi, 3.1)), h2 = hash(vec2(fi, 7.7));
+    // the line of the flock, gently bowed, drifting through itself as they fly
+    vec2 c = vec2(uFlock.x * sc + uFlock.w * e * (.055 + h1 * .004) - uFlock.w * fi * .032, uFlock.y + fi * .006 + sin(fi * 1.7 + e * .4) * .008 + (h2 - .5) * .02);
+    c.y += sin(e * (.6 + h1 * .3) + fi) * .004;
+    vec2 q = p - c;
+    float s = .0042 + h2 * .0016, fl = sin(e * (9. + h1 * 4.) + fi * 2.3);
+    // two wings from the body, rising and falling
+    vec2 elL = vec2(-s * .5, s * .22 * fl + s * .1), elR = vec2(s * .5, s * .22 * fl + s * .1), tipL = vec2(-s, s * .45 * fl - s * .05), tipR = vec2(s, s * .45 * fl - s * .05), mid = vec2(0., -s * .08);
+    float d = min(min(seg(q, mid, elL), seg(q, elL, tipL)), min(seg(q, mid, elR), seg(q, elR, tipR)));
+    m = max(m, smoothstep(.0012, .0003, d));
+  }
+  return m;
+}
+// the sky, rebuilt from the photograph: its blue (taken from the corners, where there is no cloud) as a gradient,
+// and its cloud lifted out by colour (white and grey against saturated blue) and set drifting.
+// Two clouds from the same one: a near one, large, and a far one, smaller, slower, hazier, mirrored.
+vec3 skyBlue(float y) {
+  vec3 hi = textureLod(uImg, vec2(.05, .95), 7.).rgb, lo = textureLod(uImg, vec2(.05, .05), 7.).rgb;
+  vec3 hi2 = textureLod(uImg, vec2(.95, .95), 7.).rgb, lo2 = textureLod(uImg, vec2(.95, .05), 7.).rgb;
+  return mix((lo + lo2) * .5, (hi + hi2) * .5, smoothstep(-.1, 1.1, y));
+}
+vec4 cloudAt(vec2 q) {
+  if (q.x < 0. || q.x > 1. || q.y < 0. || q.y > 1.) return vec4(0.);
+  vec3 c = texture(uImg, q).rgb;
+  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = (mx - mn) / max(mx, 1e-3);
+  float m = smoothstep(.36, .16, sat) * smoothstep(.42, .62, mx);
+  m *= smoothstep(0., .08, q.x) * smoothstep(1., .92, q.x) * smoothstep(0., .08, q.y) * smoothstep(1., .92, q.y);
+  return vec4(c, m);
+}
+vec3 rig(vec2 uv) {
+  float sc = uRes.x / uRes.y, t = uTime;
+  vec3 col = skyBlue(uv.y);
+  // the light of the sky is never flat: a softer glow towards the sun
+  col = mix(col, col * 1.18 + .04, exp(-length((uv - vec2(.12, 1.05)) * vec2(sc * .6, 1.)) * 2.2) * .5);
+  float ia = uImgSize.x / uImgSize.y;
+  // a cloud of the photograph, placed: its width (in screen heights), its height on the sky, its speed, mirrored or not, how far
+  #define CLOUD(CW, CY, SPD, OFF, MIR, HAZE, A) { float cw = sc * CW, x = mod(t * SPD * sc + sc * OFF, sc + cw) - cw * .5; if (SPD < 0.) x = sc + cw * .5 - mod(-t * SPD * sc + sc * OFF, sc + cw); vec2 q = vec2((uv.x * sc - x) / cw + .5, (uv.y - CY) / (cw / ia) + .5); if (MIR > .5) q.x = 1. - q.x; q += (vec2(noise(q * 3.6 + t * .012 + OFF), noise(q * 3.6 - t * .011 + 3. + OFF)) - .5) * .017 * smoothstep(.2, .9, length(q - .5) * 1.6); vec4 c = cloudAt(q); col = mix(col, mix(c.rgb, col, HAZE), c.a * A); }
+  CLOUD(.3, .9, -.0016, .1, 1., .55, .6)
+  CLOUD(.42, .74, -.0024, .3, 1., .4, .85)
+  CLOUD(.62, .2, .0031, .75, 0., .3, .8)
+  CLOUD(1.05, .46, .0042, .55, 0., 0., 1.)
+  // the light of the day is never quite still: cloud shadows pass over the whole sky
+  col *= .94 + .1 * noise(vec2(t * .021, 3.)) + .03 * noise(vec2(t * .07, 9.));
+  return col;
+}
 void main() {
   vec2 uv = vUv; float t = uTime, asp = uImgSize.x / uImgSize.y;
+  if (uRig > .5) {
+    vec3 col = rig(uv + uPar * .6);
+    float L = dot(col, vec3(.3, .59, .11));
+    col = mix(vec3(L), col, uSat * k_saturation);
+    col = mix(col, col * vec3(.94, .99, 1.03), k_cool);
+    col = (col - .4) * uContrast * k_contrast + .4;
+    col = max(col, 0.) * uTint * uBright * k_brightness + uLift;
+    col += uGlow * smoothstep(.1, 1., uv.x * .7 + uv.y * .6);
+    col = mix(col, col * .26, birds(uv) * (1. - uNight) * .9);
+    if (uSwoop.z > 0.) {
+      float e = (uTime - uSwoop.z) / 2.6;
+      if (e > 0. && e < 1.) {
+        float sc = uRes.x / uRes.y;
+        vec2 c = vec2(mix(-.15, 1.15, uSwoop.w > 0. ? e : 1. - e) * sc, uSwoop.y + sin(e * 3.1416) * .12 - e * .1);
+        vec2 q = vec2(uv.x * sc, uv.y) - c; float s = .05, fl = sin(uTime * 13.);
+        vec2 tl = vec2(-s, s * .5 * fl), tr = vec2(s, s * .5 * fl), el = vec2(-s * .45, s * .2 * fl + s * .1), er = vec2(s * .45, s * .2 * fl + s * .1), m0 = vec2(0., -s * .1);
+        float dd = min(min(seg(q, m0, el), seg(q, el, tl)), min(seg(q, m0, er), seg(q, er, tr)));
+        col = mix(col, col * .35, smoothstep(.012, .002, dd) * (1. - uNight) * .8);
+      }
+    }
+    o = vec4(col, 1.);
+    return;
+  }
   vec2 iu = cover(uv, k_zoom);
+  // a sky drifts very slowly, as clouds do
+  iu.x += uSky * sin(t * .006) * .03;
   vec2 mk = texture(uMask, iu).rg;
   iu += uPar * mix(1., .45, mk.g);
   // the rig, in aspect-true space
@@ -117,19 +195,44 @@ void main() {
   col = mix(col, col * vec3(.6, .64, .7), uStorm * .6);
   col = mix(col, col * vec3(1.08, 1., .9) + .02, uSun);
   col += uFlash * vec3(.5, .55, .68);
+  // birds: dark against the day, gone by night
+  col = mix(col, col * .28, birds(uv) * uSky * (1. - uNight) * .85);
   o = vec4(col, 1.);
 }`;
 
   const GLASS = `#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 o;
-uniform sampler2D uScene, uWater, uFog, uGrease;
+uniform sampler2D uScene, uWater, uFog, uGrease, uPL;
+uniform float uLodL, uPLOn; uniform vec4 uTiles[4];
+// the people: tile i of the atlas, placed at uTiles[i] (left, top, width, height in the view, y down)
+vec4 people(vec2 uv, float lod) {
+  vec2 q = vec2(uv.x, 1. - uv.y); vec4 acc = vec4(0.);
+  for (int i = 0; i < 4; i++) {
+    vec4 t = uTiles[i]; if (t.z <= 0.) continue;
+    vec2 l = (q - t.xy) / t.zw;
+    if (l.x < -.02 || l.y < -.02 || l.x > 1.02 || l.y > 1.02) continue;
+    vec4 c = textureLod(uPL, vec2((float(i) + clamp(l.x, .002, .998)) / 4., clamp(l.y, .002, .998)), max(lod + uLodL, 0.));
+    acc = c + acc * (1. - c.a);
+  }
+  return acc;
+}
 uniform vec2 uRes;
-uniform float uTime, uExpo, uNight, uFlash, uLod;
+uniform float uTime, uExpo, uNight, uFlash, uLod, uFR;
+uniform vec4 uKnock, uWarm;
+uniform vec4 uRects[40]; uniform int uRectN;
+float sdBox(vec2 p, vec2 b) { vec2 d = abs(p) - b; return length(max(d, 0.)) + min(max(d.x, d.y), 0.); }
+uniform vec4 uPeer[4]; // other people at this glass: where their fingertip is (x, y), how hard it presses, how present they are
 ${decl(GLASS_U)}
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 // the scene is rendered at the photograph's own resolution, so its levels are shifted to match the screen's
-vec3 S(vec2 uv, float lod) { return textureLod(uScene, uv, max(lod + uLod, 0.)).rgb; }
+// what is out there: the scene, and in front of it (still behind the glass) the people, drawn at the screen's own
+// resolution and premultiplied, so the frost blurs them exactly as it blurs everything else
+vec3 S(vec2 uv, float lod) {
+  vec3 c = textureLod(uScene, uv, max(lod + uLod, 0.)).rgb;
+  if (uPLOn > .5) { vec4 l = people(uv, lod); c = c * (1. - l.a) + l.rgb * mix(1., .6, uNight); }
+  return c;
+}
 float micro(vec2 px) {
   vec2 c = px / 2.8, i = floor(c), f = fract(c);
   vec2 p = vec2(hash(i), hash(i + 5.1)) * .6 + .2;
@@ -138,7 +241,13 @@ float micro(vec2 px) {
 }
 vec3 filmic(vec3 x) { return clamp((x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14), 0., 1.); }
 void main() {
-  vec2 uv = vUv, px = gl_FragCoord.xy, cv = vec2(uv.x, 1. - uv.y); // the 2D canvases arrive unflipped
+  vec2 uv = vUv, px = gl_FragCoord.xy;
+  float ar = uRes.x / uRes.y;
+  {
+    vec2 kd = (vUv - uKnock.xy) * vec2(ar, 1.); float ke = uTime - uKnock.z, kr = length(kd);
+    if (ke > 0. && ke < 2.4) { float ring = exp(-pow((kr - ke * .62) / .03, 2.)) * exp(-ke * 1.7) + exp(-pow((kr - ke * .4) / .02, 2.)) * exp(-ke * 2.6) * .6; uv += kd / max(kr, 1e-3) * ring * .011 * uKnock.w / vec2(ar, 1.); }
+  }
+  vec2 cv = vec2(uv.x, 1. - uv.y); // the 2D canvases arrive unflipped
   vec4 w = texture(uWater, cv);
   w.rgb /= max(w.a, 1e-4); // the water layer is premultiplied; this is what the 2D canvas upload used to undo
   vec2 n = (w.rg - .5) * 2.; n.y = -n.y;
@@ -149,6 +258,9 @@ void main() {
   if (fa < 1.) {
     vec2 ca = (uv - .5) * k_ca;
     clear = vec3(S(uv + ca, k_clearBlur).r, S(uv, k_clearBlur).g, S(uv - ca, k_clearBlur).b);
+    // the people close behind the pane are in focus through clear glass: no colour fringing on them
+    if (uPLOn > .5) { float la = people(uv, 0.).a; if (la > 0.) clear = mix(clear, S(uv, 0.), la); }
+    clear = clear * 1.07 + .016;
   }
   if (fa > 0.) {
     vec2 j = (vec2(hash(px), hash(px + 7.3)) - .5) * .012;
@@ -156,6 +268,11 @@ void main() {
     float lum = dot(far, vec3(.3, .6, .1));
     frost = mix(far, vec3(lum), k_frostDesat) * .8 + vec3(k_frostLift, k_frostLift * 1.1, k_frostLift * 1.06) * (1. - uNight * .7) + lum * k_frostGlow;
     frost += (micro(px) - .35) * k_micro * (.6 + lum) + (hash(floor(px)) - .5) * .01;
+    if (uRectN > 0) {
+      float occ = 0.; vec2 q = vUv * vec2(ar, 1.);
+      for (int i = 0; i < 40; i++) { if (i >= uRectN) break; vec4 r = uRects[i]; float d = sdBox(q - vec2(r.x * ar, r.y - .012), vec2(r.z * ar, r.w)); occ = max(occ, exp(-max(d, 0.) / .045) * (d < 0. ? 1. : 1.)); }
+      frost *= 1. - .3 * occ;
+    }
   }
   vec3 col = mix(clear, frost, fa);
   // and the water only where there is a drop
@@ -169,6 +286,23 @@ void main() {
     vec3 N = normalize(vec3(n * 1.8, max(th, .08)));
     vec3 lamp = mix(vec3(1.), vec3(1., .78, .52), uNight);
     col += a * lamp * mix(1., .7, uNight) * (pow(max(dot(N, normalize(vec3(-.35, .7, .62))), 0.), k_specSharp) * k_spec + pow(max(dot(N, normalize(vec3(.45, -.5, .74))), 0.), k_specSharp * 2.6) * .28);
+  }
+  // their fingertips, from the other side: a soft shadow of the hand when it comes close, and where the skin
+  // touches the glass, a pale, flattened oval that the frost cannot hide
+  for (int i = 0; i < 4; i++) {
+    vec4 P = uPeer[i];
+    if (P.w <= 0.) continue;
+    vec2 d = (uv - P.xy) * vec2(uRes.x / uRes.y, 1.);
+    float r = uFR, l = length(d * vec2(1., .9));
+    float halo = exp(-pow(l / (r * 4.6), 2.)) * (.6 + .4 * (1. - P.z));
+    col *= 1. - .36 * halo * P.w * mix(1., .6, uNight);
+    float core = smoothstep(r * 1.05, r * .55, length(d * vec2(1., .82) + vec2(0., r * .12))) * P.z;
+    vec3 skin = vec3(.8, .63, .55) * mix(1., .35, uNight) * (.75 + .25 * dot(col, vec3(.33)));
+    col = mix(col, skin, core * P.w * .7);
+  }
+  {
+    float we = uTime - uWarm.z;
+    if (we > 0. && we < 3.5) { float wd = length((vUv - uWarm.xy) * vec2(ar, 1.)); col += vec3(1., .8, .62) * exp(-wd * wd / .006) * smoothstep(0., .25, we) * exp(-we * 1.1) * .32; }
   }
   vec3 bl = max(S(uv, 5.5) - k_bloomThreshold, 0.) * k_bloom + max(S(uv, 4.) - (k_bloomThreshold + .12), 0.) * k_bloom * .7;
   col += bl * (1. - f * .5);
@@ -228,13 +362,16 @@ void main() { o = texture(uSp, vT) * vA; }`;
   class Rain {
     constructor(canvas, o = {}) {
       this.c = canvas;
-      this.o = Object.assign({ img: "", mask: "", water: 0.75, fogScale: 0.5, dpr: 1.5, reduce: false }, o);
+      this.o = Object.assign({ img: "", mask: "", sky: false, water: 0.75, fogScale: 0.5, dpr: 1.5, reduce: false }, o);
       this.P = Object.assign({}, DEFAULTS, o.params || {});
+      // without a mask there is no plant to rig: nothing in the scene bends
+      if (!this.o.mask) this.P.plant = 0;
+      this.peers = new Float32Array(16); this.flock = [0, 0, 0, 1]; this.nextFlock = 6 + Math.random() * 10;
       const gl = canvas.getContext("webgl2", { antialias: false, alpha: false });
       if (!gl) { this.dead = true; return; }
       this.gl = gl;
-      this.pScene = this.program(SCENE, ["uImg", "uMask", "uRes", "uImgSize", "uPar", "uRoot", "uTime", "uWind", "uStem", "uSun", "uRain", "uNight", "uStorm", "uFlash", "uSat", "uBright", "uContrast", "uTint", "uLift", "uGlow", "uSegA", "uSegB", "uAng", ...SCENE_U.map((k) => "k_" + k)]);
-      this.pGlass = this.program(GLASS, ["uScene", "uWater", "uFog", "uGrease", "uRes", "uTime", "uExpo", "uNight", "uFlash", "uLod", ...GLASS_U.map((k) => "k_" + k)]);
+      this.pScene = this.program(SCENE, ["uImg", "uMask", "uRes", "uImgSize", "uPar", "uRoot", "uTime", "uWind", "uStem", "uSun", "uRain", "uNight", "uStorm", "uFlash", "uSat", "uBright", "uContrast", "uTint", "uLift", "uGlow", "uSegA", "uSegB", "uAng", "uSky", "uFlock", "uRig", "uPL", "uSwoop", ...SCENE_U.map((k) => "k_" + k)]);
+      this.pGlass = this.program(GLASS, ["uScene", "uWater", "uFog", "uGrease", "uRes", "uTime", "uExpo", "uNight", "uFlash", "uLod", "uPeer", "uFR", "uPL", "uLodL", "uPLOn", "uTiles", "uKnock", "uWarm", "uRects", "uRectN", ...GLASS_U.map((k) => "k_" + k)]);
       this.pDrop = this.program(DROPF, ["uSp", "uSize"], DROPV);
       const quad = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, quad);
@@ -255,7 +392,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       gl.bindVertexArray(null);
       this.inst = new Float32Array(6 * 1024);
       this.T = {};
-      for (const k of ["img", "mask", "water", "fog", "grease", "scene", "sp"]) this.T[k] = this.texture(["img", "scene"].includes(k));
+      for (const k of ["img", "mask", "water", "fog", "grease", "scene", "sp", "pl"]) this.T[k] = this.texture(["img", "scene", "pl"].includes(k));
       this.fbo = gl.createFramebuffer();
       this.wfbo = gl.createFramebuffer();
       this.imgSize = IMG.slice();
@@ -286,7 +423,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
       // the water layer's size (in its own pixels); it is drawn on the graphics card, never on a 2D canvas
       this.water = { width: 2, height: 2 };
-      this.fog = document.createElement("canvas"); this.fx = this.fog.getContext("2d");
+      this.fog = document.createElement("canvas"); this.fx = this.fog.getContext("2d", { willReadFrequently: true });
       this.grease = document.createElement("canvas"); this.gx = this.grease.getContext("2d");
       this.drops = [];
       this.t0 = this.last = performance.now();
@@ -298,7 +435,8 @@ void main() { o = texture(uSp, vT) * vA; }`;
       let n = 0;
       const done = () => { if (++n === 2) { this.ready = true; canvas.classList.add("is-ready"); if (this.onready) this.onready(); } };
       this.load("img", this.o.img, done, true);
-      this.load("mask", this.o.mask, done);
+      if (this.o.mask) this.load("mask", this.o.mask, done);
+      else { const g = this.gl; g.bindTexture(g.TEXTURE_2D, this.T.mask.t); g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, 1, 1, 0, g.RGBA, g.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255])); done(); }
     }
     program(frag, names, vert = QUAD) {
       const gl = this.gl;
@@ -333,6 +471,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
     }
     load(k, src, done, size) {
       const im = new Image();
+      if (/^https?:/.test(src)) im.crossOrigin = "anonymous";
       im.decoding = "async";
       im.onload = () => { if (size) { this.imgSize = [im.naturalWidth, im.naturalHeight]; if (this.W) this.alloc(); } this.upload(k, im); done(); };
       im.onerror = done;
@@ -475,7 +614,10 @@ void main() { o = texture(uSp, vT) * vA; }`;
     }
     up() { if (this.finger && this.onTouch) this.onTouch(false, this.finger.x * 2 - 1); this.finger = null; }
     local(cx, cy, any) {
-      const r = this.c.getBoundingClientRect(), x = (cx - r.left) / r.width, y = (cy - r.top) / r.height;
+      // where the canvas is, measured at most every few frames: measuring on every mouse event makes the browser lay out the page each time
+      const now = performance.now();
+      if (!this.rc || now - this.rcT > 120) { this.rc = this.c.getBoundingClientRect(); this.rcT = now; }
+      const r = this.rc, x = (cx - r.left) / r.width, y = (cy - r.top) / r.height;
       return any || (x >= 0 && x <= 1 && y >= 0 && y <= 1) ? { x, y } : null;
     }
     // the fingertip's radius in CSS pixels: the ring on screen is drawn at exactly this size
@@ -549,7 +691,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       const W = this.water.width, H = this.water.height, s = this.state, K = this.k, wind = this.wind, P = this.P;
       this.time += dt;
       this.blow(dt);
-      const rain = pre ? 1 : s.rain * (1 - s.sun) * (1 + s.storm * 1.2);
+      const rain = this.o.dry ? 0 : pre ? 1 : s.rain * (1 - s.sun) * (1 + s.storm * 1.2);
       this.buildGrid();
       const expect = (P.rate + wind.gust * P.gustRain) * this.area * dt * rain;
       let n = Math.floor(expect) + (Math.random() < expect % 1 ? 1 : 0);
@@ -687,6 +829,12 @@ void main() { o = texture(uSp, vT) * vA; }`;
       gl.uniform1f(U.u.uSat, G.sat); gl.uniform1f(U.u.uBright, G.bright); gl.uniform1f(U.u.uContrast, G.contrast);
       gl.uniform3fv(U.u.uTint, G.tint); gl.uniform3fv(U.u.uLift, G.lift); gl.uniform3fv(U.u.uGlow, G.glow);
       for (const k of SCENE_U) gl.uniform1f(U.u["k_" + k], P[k]);
+      // now and then a flock crosses the sky, from one side or the other, a little higher or lower
+      if (this.o.sky) {
+        if (this.o.rig && t > (this.nextSwoop || 25)) { this.swoop = [0, 0.35 + Math.random() * 0.35, t, Math.random() < 0.5 ? 1 : -1]; this.nextSwoop = t + 35 + Math.random() * 40; }
+        if (t > this.nextFlock && this.o.birds !== false) { const dir = Math.random() < 0.5 ? 1 : -1, sc = this.c.width / this.c.height; this.flock = [dir > 0 ? -0.15 : 1.15 + 14 * 0.032 / sc, 0.45 + Math.random() * 0.35, t, dir]; this.nextFlock = t + (this.o.rig ? 14 + Math.random() * 18 : 38 + Math.random() * 50); }
+      }
+      gl.uniform1f(U.u.uSky, this.o.sky ? 1 : 0); gl.uniform4fv(U.u.uFlock, this.flock); gl.uniform1f(U.u.uRig, this.o.rig ? 1 : 0); gl.uniform4fv(U.u.uSwoop, this.swoop || [0, 0, -9, 1]);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindTexture(gl.TEXTURE_2D, this.T.scene.t);
       gl.generateMipmap(gl.TEXTURE_2D);
@@ -695,7 +843,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       U = this.pGlass;
       gl.useProgram(U.p);
       gl.uniform1f(U.u.uLod, this.lod);
-      [["uScene", "scene"], ["uWater", "water"], ["uFog", "fog"], ["uGrease", "grease"]].forEach(([u, k], i) => {
+      [["uScene", "scene"], ["uWater", "water"], ["uFog", "fog"], ["uGrease", "grease"], ["uPL", "pl"]].forEach(([u, k], i) => {
         gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, this.T[k].t); gl.uniform1i(U.u[u], i);
       });
       gl.uniform2f(U.u.uRes, this.c.width, this.c.height);
@@ -704,7 +852,64 @@ void main() { o = texture(uSp, vT) * vA; }`;
       gl.uniform1f(U.u.uNight, s.night);
       gl.uniform1f(U.u.uFlash, s.flash);
       for (const k of GLASS_U) gl.uniform1f(U.u["k_" + k], P[k]);
+      gl.uniform1f(U.u.uPLOn, this.plOn ? 1 : 0); gl.uniform1f(U.u.uLodL, Math.log2(this.plK || 1)); gl.uniform4fv(U.u.uTiles, this.tileU || new Float32Array(16));
+      gl.uniform4fv(U.u.uPeer, this.peers); gl.uniform1f(U.u.uFR, this.fingerRadius() / this.H);
+      gl.uniform1i(U.u.uRectN, this.rectN || 0); if (this.rectN) gl.uniform4fv(U.u.uRects, this.rectU);
+      gl.uniform4fv(U.u.uKnock, this.knockU || [0, 0, -9, 0]); gl.uniform4fv(U.u.uWarm, this.warmU || [0, 0, -9, 0]);
+      this.now = t;
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    // someone on the other side (i < 4): x, y in 0..1 of this view, pressing 0..1, present 0..1
+    peer(i, x, y, press, here) { const k = i * 4; this.peers[k] = x; this.peers[k + 1] = 1 - y; this.peers[k + 2] = press; this.peers[k + 3] = here; }
+    // a knock on the glass: the pane shivers and the drops near it let go and run
+    knock(x, y, k = 1) {
+      this.knockU = [x, 1 - y, this.now || 0, 0];
+      const W = this.water.width, H = this.water.height, cx = x * W, cy = y * H, R = Math.max(W, H) * 0.3;
+      for (const q of this.drops) { const d = Math.hypot(q.x - cx, q.y - cy); if (d < R && q.g > 1.5 * this.k) { q.mv = true; q.vy += (1 - d / R) * 90 * this.k; q.vx += (q.x - cx) / R * 30 * this.k; q.age = Math.max(q.age, 2); } }
+    }
+    // two fingertips meeting through the glass: it warms where they touch
+    warm(x, y) { this.warmU = [x, 1 - y, this.now || 0, 1]; this.wipe(x, y, x, y); }
+    // a breath on the glass: the frost comes back where it fell, so it can be written on again
+    breathe(x, y, a = 0.05) {
+      const f = this.fx, fw = this.fog.width, fh = this.fog.height, r = this.fingerRadius() * this.o.fogScale * 2.6;
+      const g = f.createRadialGradient(x * fw, y * fh, 0, x * fw, y * fh, r);
+      g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(0.6, `rgba(255,255,255,${a * 0.6})`); g.addColorStop(1, "rgba(255,255,255,0)");
+      f.fillStyle = g; f.fillRect(x * fw - r, y * fh - r, r * 2, r * 2);
+    }
+    // what is stuck on the inside of the glass (centre x, y and half size, in the canvas's 0..1, y up)
+    rects(arr, n) { this.rectU = arr; this.rectN = n; }
+    // how frosted the glass is at a point (0..1 of the view): 0 wiped clean, 1 fully frosted
+    fogAt(x, y) {
+      if (this.dead || !this.fog.width) return 1;
+      const X = Math.max(0, Math.min(this.fog.width - 1, Math.round(x * this.fog.width))), Y = Math.max(0, Math.min(this.fog.height - 1, Math.round(y * this.fog.height)));
+      return (this.fx.getImageData(X, Y, 1, 1).data[0] / 255) * this.P.fog;
+    }
+    // the people behind the glass, drawn by whoever knows them (a 2D canvas), sent up when it changed
+    tiles(arr, k) { this.tileU = arr; this.plK = k; }
+    layer(canvas, on = true) {
+      this.plOn = on; if (!on) return;
+      const gl = this.gl; this.plW = canvas.width;
+      gl.bindTexture(gl.TEXTURE_2D, this.T.pl.t);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      this.upload("pl", canvas, false);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    }
+    // the glass moved under the view (by css pixels): its drops and its frost move with it, fresh frost comes in
+    pan(dx, dy) {
+      if (this.dead) return;
+      const ws = this.water.width / this.W, fs = this.fog.width / this.W;
+      for (const q of this.drops) { q.x += dx * ws; q.y += dy * ws; }
+      const W = this.water.width, H = this.water.height;
+      this.drops = this.drops.filter((q) => q.x > -20 && q.x < W + 20 && q.y > -40 && q.y < H + 20);
+      for (const [c, x, fill] of [[this.fog, this.fx, "#fff"], [this.grease, this.gx, "#000"]]) {
+        const ox = Math.round(dx * fs), oy = Math.round(dy * fs);
+        if (!ox && !oy) continue;
+        x.save(); x.globalCompositeOperation = "copy"; x.drawImage(c, ox, oy); x.restore();
+        x.fillStyle = fill;
+        if (ox > 0) x.fillRect(0, 0, ox, c.height); else if (ox < 0) x.fillRect(c.width + ox, 0, -ox, c.height);
+        if (oy > 0) x.fillRect(0, 0, c.width, oy); else if (oy < 0) x.fillRect(0, c.height + oy, c.width, -oy);
+      }
+      this.greaseDirty = true;
     }
     destroy() {
       if (this.dead) return;
