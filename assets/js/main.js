@@ -73,20 +73,20 @@
 
   // Z.v: 0 = inside the centre page, 1 = every page in view. The centre is the page you leave or enter.
   const Z = { v: 0, t: 0, tw: null, center: "home" };
-  // one clock for every scene: it starts at the visitor's own hour and then the day goes by on its own, a whole day in
-  // a few minutes, so whoever stays a while sees the light change everywhere (landing, work, every page to come)
-  const CLOCK = { h: 10.5, last: 0, run: true, minutes: 6, born: Date.now() };
-  if (/[?&]hour=(\d+(\.\d+)?)/.test(location.search)) CLOCK.h = +location.search.match(/[?&]hour=(\d+(\.\d+)?)/)[1];
+  // the landing's own clock: scrolling first takes the day from afternoon to night, then pulls the camera back
+  // t: where the scroll has put the day (07:00 → 00:00); n: the small hours after midnight, until it is morning again
+  const DAY = { v: 0, t: 0, n: 0, nv: 0, run: false, last: 0 };
+  const NIGHT = 7 / 17; // 00:00 → 07:00, in the same units as 07:00 → 00:00
   function render() {
     const e = Z.v, c = boards[Z.center];
     cam.s = 1 + (L.s0 - 1) * e;
     cam.x = -c._x + (L.ov.x + c._x) * e;
     cam.y = -c._y + (L.ov.y + c._y) * e;
     world.style.transform = `translate3d(${cam.x.toFixed(2)}px,${cam.y.toFixed(2)}px,0) scale(${cam.s.toFixed(5)})`;
-    const k = e.toFixed(3), kg = sstep(0.3, 0.75, e).toFixed(3);
-    if (k !== CAMV.k) { CAMV.k = k; CAMV.space.forEach((x) => (x.style.opacity = k)); CAMV.edge.forEach((x) => (x.style.opacity = k)); }
-    if (kg !== CAMV.kg) { CAMV.kg = kg; CAMV.fade.forEach((x) => (x.style.opacity = kg)); }
+    world.style.setProperty("--k", e.toFixed(3));
+    html.style.setProperty("--zk", e.toFixed(3));
     window.__zk = e;
+    world.style.setProperty("--kg", sstep(0.3, 0.75, e).toFixed(3));
     const [cc, cr] = GRID[Z.center];
     // the other pages dock into place as the camera pulls back
     for (const [id, [col, row]] of Object.entries(GRID)) {
@@ -101,15 +101,12 @@
     if (m !== mode) setMode(m);
     html.classList.toggle("is-zooming", e > 0.001 && e < 0.999);
   }
-  // the few things that fade with the camera
-  const CAMV = { k: "", kg: "", space: $$(".space canvas"), edge: $$(".board__edge"), fade: $$(".board__label, .board__soon, .ghost") };
   const zto = (v, dur, ease) => new Promise((res) => {
     if (Z.tw) Z.tw.kill();
     Z.tw = gsap.to(Z, { v, duration: reduce ? 0 : dur, ease, onUpdate: render, onComplete: () => { Z.t = Z.v; Z.tw = null; render(); res(); } });
   });
 
   /* ---------------- state ---------------- */
-  let presence = null;
   let mode = "focus", current = "home", busy = false, pageCtx = null, caseOpen = null, topSince = 0;
   function setMode(m) {
     mode = m;
@@ -174,7 +171,6 @@
     mode = "focus";
     window.scrollTo(0, 0);
     view(current).scrollTop = y;
-    if (page.dataset.page === "work" && wall) requestAnimationFrame(() => wall.leave());
   }
   // while the camera moves, a page you left at its bottom rolls back to its top
   function settle(id) {
@@ -199,7 +195,7 @@
   }
 
   async function go(target, { push = true, slug = null } = {}) {
-    if (busy || (target !== "overview" && isLocked(target))) return;
+    if (busy) return;
     if (target === "overview" && mode === "overview") target = current;
     busy = true;
     try { await fly(target, push, slug); }
@@ -224,6 +220,7 @@
     if (Z.v >= 0.999) unlift();
     html.classList.add("is-flying");
     if (target === "overview") {
+      if (DAY.t < 1) gsap.to(DAY, { t: 1, v: 1, duration: reduce ? 0 : 1.1, ease: "power2.inOut" });
       await zto(1, 1.15, "power3.inOut");
       Z.center = "home";
     } else {
@@ -238,51 +235,61 @@
     }
   }
 
-  /* ---------------- the pull: wheel and touch move the camera directly ----------------
-     Down always goes on: from a page (or the landing) the camera pulls back to see every page; from there, the next
-     page. Up goes back the same way. Nobody is ever stuck. */
-  let pullAcc = 0, wheelGap = 0, atOverview = 0, goOK = false;
-  const ORDER = ["home", "work", "about", "services", "contact"];
-  const nextPage = (from) => { for (let i = 1; i <= ORDER.length; i++) { const id = ORDER[(ORDER.indexOf(from) + i) % ORDER.length]; if (!isLocked(id)) return id; } return "home"; };
-  const pageEnd = () => window.scrollY + innerHeight >= d.documentElement.scrollHeight - 2;
-  function pull(dy, fresh) {
+  /* ---------------- the pull: wheel and touch move the camera directly ---------------- */
+  let pullAcc = 0;
+  function pull(dy) {
     if (busy || caseOpen || Z.tw) return;
     if (mode === "page") {
-      // a page hands over to the camera at its end (down) or at its top (up)
-      const atTop = window.scrollY <= 1;
-      if ((dy > 0 && !pageEnd()) || (dy < 0 && !atTop) || performance.now() - topSince < 350) { pullAcc = 0; return; }
-      pullAcc += Math.abs(dy);
-      if (pullAcc < 90) return;
+      if (window.scrollY > 1 || dy >= 0 || performance.now() - topSince < 350) { pullAcc = 0; return; }
+      pullAcc -= dy;
+      if (pullAcc < 70) return;
       const from = current;
       closePage();
-      Z.center = from; Z.v = 0; Z.t = clamp((pullAcc - 90) / L.ZR);
+      Z.center = from; Z.v = 0; Z.t = clamp((pullAcc - 70) / L.ZR);
       pullAcc = 0;
       setMode("overview");
       return;
     }
-    // every page in view: a fresh push down flies on to the next page
-    if (Z.v >= 0.999 && Z.t >= 0.999 && dy > 0) {
-      if (fresh) goOK = performance.now() - atOverview > 450;
-      if (!goOK) return;
-      pullAcc += dy;
-      if (pullAcc > 120) { pullAcc = 0; go(nextPage(current)); }
+    if (Z.center === "home") {
+      if (DAY.n > 0 && dy < 0 && Z.t === 0) { DAY.n = Math.max(0, DAY.n + dy / (L.ZR * (hero.rain ? hero.rain.P.dayLength : 2.4))); return; }
+      // one scroll, two stretches: the day goes by first (0 → 1), then the camera pulls back (1 → 2)
+      const base = Z.t > 0 ? 1 + Z.t : DAY.t;
+      let u = base + dy / (L.ZR * (base < 1 || (dy < 0 && base <= 1) ? (hero.rain ? hero.rain.P.dayLength : 2.4) : 1));
+      if (reduce) u = dy > 0 ? (DAY.t < 1 ? 1 : 2) : Z.t > 0 ? 1 : 0;
+      u = Math.max(0, Math.min(2, u));
+      DAY.t = Math.min(1, u);
+      Z.t = Math.max(0, u - 1);
+      if (Z.t < 0.002) Z.t = 0; else if (Z.t > 0.998) Z.t = 1;
+      if (DAY.t < 0.001) DAY.t = 0; else if (DAY.t > 0.999) DAY.t = 1;
       return;
     }
-    // and up, from every page in view, goes back to the page you came from
-    if (Z.v >= 0.999 && dy < 0 && current !== 'home' && Z.center === 'home') { if (fresh) go(current); return; }
-    pullAcc = 0;
     const prev = Z.t;
-    Z.t = clamp(Z.t + dy / L.ZR);
+    Z.t = clamp(Z.t - dy / L.ZR);
     if (Z.t < 0.002) Z.t = 0; else if (Z.t > 0.998) Z.t = 1;
     if (reduce && Z.t !== prev) Z.t = Z.t > prev ? 1 : 0;
   }
   // the camera follows the pull with a little inertia; when it rests at either end, it arrives
   function follow() {
-    const now = performance.now(), dt = Math.min(0.1, (now - (CLOCK.last || now)) / 1000);
-    CLOCK.last = now;
-    if (CLOCK.run && !reduce) CLOCK.h = (CLOCK.h + (dt * 24) / (CLOCK.minutes * 60)) % 24;
-    light(CLOCK.h);
-    if (Z.v >= 0.999 && !atOverview) atOverview = now; else if (Z.v < 0.999) atOverview = 0;
+    const dd = DAY.t - DAY.v;
+    if (Math.abs(dd) > 0.0002) DAY.v += dd * (reduce ? 1 : 0.06); else DAY.v = DAY.t;
+    // whenever the pages are in view, it is night on the landing
+    if (Z.v > 0.02) { if (DAY.t < 1) DAY.t = 1; DAY.n = 0; }
+    // and while someone stays on the landing, time passes on its own: the whole day in a few minutes
+    const now = performance.now(), dt = Math.min(0.1, (now - (DAY.last || now)) / 1000);
+    DAY.last = now;
+    const per = hero.rain ? hero.rain.P.clock : 3;
+    if (DAY.run && per > 0 && mode === "focus" && Z.center === "home" && Z.t === 0 && Z.v === 0 && !busy) {
+      // real hours at an even pace: 24 of them in `clock` minutes
+      const d = DAY.v + DAY.nv, step = (dt * 24) / (per * 60) / (hero.slope ? hero.slope(d) : 17);
+      if (DAY.t < 1) { DAY.t = Math.min(1, DAY.t + step); DAY.v = Math.min(DAY.t, DAY.v + step); }
+      else if (DAY.v > 0.999) {
+        DAY.n += step;
+        // morning again: the scroll starts over from here
+        if (DAY.n >= NIGHT) DAY.t = DAY.v = DAY.n = DAY.nv = 0;
+      }
+    }
+    DAY.nv += (DAY.n - DAY.nv) * (Math.abs(DAY.n - DAY.nv) > 0.02 ? (reduce ? 1 : 0.06) : 1);
+    if (hero.day) hero.day(DAY.v + DAY.nv);
     if (Z.tw || busy) return;
     const dz = Z.t - Z.v;
     if (Math.abs(dz) > 0.0004) { Z.v += dz * (reduce ? 1 : 0.13); render(); }
@@ -291,13 +298,9 @@
     else if (Z.v === 1 && Z.center !== "home") { Z.center = "home"; render(); }
   }
   const norm = (e) => (e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY);
-  let lastWheel = 0;
   addEventListener("wheel", (e) => {
-    const now = performance.now(), fresh = now - lastWheel > 260 || wheelGap;
-    wheelGap = 0; lastWheel = now;
-    // on the work wall, sideways scrolling moves along the wall
-    if (mode === "page" && current === "work" && wall && !caseOpen && Math.abs(e.deltaX) > Math.abs(e.deltaY)) { wall.nudge(-e.deltaX, 0); return; }
-    pull(norm(e), fresh);
+    if (mode === "page" && current === "work" && !caseOpen && !busy && rail.wheel(norm(e) + e.deltaX)) return;
+    pull(norm(e));
   }, { passive: true });
   let ty = null;
   addEventListener("touchstart", (e) => { ty = e.touches[0].clientY; }, { passive: true });
@@ -306,18 +309,15 @@
     const y = e.touches[0].clientY, dy = (ty - y) * 1.2;
     ty = y;
     if (hero.wiping && hero.wiping()) return;
-    if (mode === "page" && current === "work") return; // on the wall a finger moves the wall
-    pull(dy, true);
+    pull(dy);
   }, { passive: true });
   addEventListener("touchend", () => { ty = null; }, { passive: true });
   addEventListener("keydown", (e) => {
     if (e.target.closest && e.target.closest("input, select, textarea")) return;
     if (e.key === "Escape") { if (caseOpen) closeCase(); else if (mode === "page") go("overview"); else if (mode === "overview") go(current); return; }
-    if (mode === "page" && current === "work" && wall && !caseOpen && /^Arrow/.test(e.key)) { e.preventDefault(); wall.key(e.key); return; }
+    if (mode === "page" && current === "work" && !caseOpen && (e.key === "ArrowRight" || e.key === "ArrowLeft")) { rail.key(e.key === "ArrowRight" ? 1 : -1); return; }
     if (mode === "focus" && ["ArrowDown", "PageDown", " "].includes(e.key)) { e.preventDefault(); go("overview"); }
     else if (mode === "overview" && !busy && ["ArrowUp", "PageUp"].includes(e.key)) { e.preventDefault(); go(current); }
-    else if (mode === "overview" && !busy && ["ArrowDown", "PageDown", " "].includes(e.key)) { e.preventDefault(); go(nextPage(current)); }
-    else if (mode === "page" && current === "work" && !caseOpen && e.key === "PageDown") { e.preventDefault(); go("overview"); }
   });
 
   /* ---------------- the card steps aside whenever big type needs the corner ---------------- */
@@ -435,9 +435,9 @@
       if (k === "sun") gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 4, ease: "sine.inOut" }, "+=9");
       if (k === "rain") gsap.timeline().to(rain.state, { storm: 1, duration: 2, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 5, ease: "sine.inOut" }, "+=10");
       // drawn on the glass: the hour and the sky answer
-      const hour = (to) => { let d = ((to - CLOCK.h + 36) % 24) - 12; gsap.to(CLOCK, { h: "+=" + d, duration: reduce ? 0 : 3.5, ease: "sine.inOut", onComplete: () => (CLOCK.h = (CLOCK.h + 24) % 24) }); };
-      if (k === "day") { hour(12); gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 5, ease: "sine.inOut" }, "+=12"); }
-      if (k === "night") hour(23);
+      const hour = (to) => { DAY.n = DAY.nv = 0; gsap.to(DAY, { t: to, duration: reduce ? 0 : 3.5, ease: "sine.inOut" }); };
+      if (k === "day") { hour(0.2); gsap.timeline().to(rain.state, { sun: 1, duration: 3, ease: "sine.inOut" }).to(rain.state, { sun: 0, duration: 5, ease: "sine.inOut" }, "+=12"); }
+      if (k === "night") hour(1);
       if (k === "cloud") gsap.timeline().to(rain.state, { storm: 0.45, duration: 3, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 6, ease: "sine.inOut" }, "+=20");
       if (k === "storm") { gsap.timeline().to(rain.state, { storm: 1, duration: 2.5, ease: "sine.inOut" }).to(rain.state, { storm: 0, duration: 6, ease: "sine.inOut" }, "+=18"); gsap.delayedCall(2.6, () => { rain.state.flash = 0.9; gsap.to(rain.state, { flash: 0, duration: 1, ease: "power2.out" }); if (window.Sound) Sound.thunder(0.15); }); }
     };
@@ -448,6 +448,22 @@
     let lastAct = performance.now(), nextIdle = 30000, idleN = 0, lastPeriod = null, idleBusy = false, lastSaid = 0;
     addEventListener("pointerdown", () => { lastAct = performance.now(); nextIdle = 30000; }, true);
     const periodOf = (h) => (h >= 6 && h < 10.5 ? "morning" : h >= 10.5 && h < 14.5 ? "midday" : h >= 14.5 && h < 18.3 ? "afternoon" : h >= 18.3 && h < 20.3 ? "sunset" : h >= 20.3 && h < 22.3 ? "evening" : "night");
+    setInterval(async () => {
+      if (!voice || idleBusy || mode !== "focus" || busy || !introEnd || document.hidden) return;
+      const now = performance.now();
+      if (now < introEnd + 8000 || vEl.classList.contains("is-on") || wiping || (ink && (ink.strokes.length || ink.busy))) return;
+      const period = periodOf(hourNow), idle = now - lastAct;
+      let reason = null;
+      // the turns of the day worth a word: morning, sunset, night
+      if (period !== lastPeriod) { if (lastPeriod !== null && idle > 6000 && ["morning", "sunset", "night"].includes(period)) reason = "hour"; lastPeriod = period; }
+      if (!reason && idle > nextIdle) reason = "idle";
+      if (!reason || idleN >= 8 || now - lastSaid < 35000) return;
+      idleN++; lastSaid = now; nextIdle = idle + 40000 + Math.random() * 35000; idleBusy = true;
+      try {
+        const text = await voice.ambient({ period, hour: hourNow, storm: rain.state.storm > 0.5, rain: rain.state.rain * (1 + rain.state.storm), idle });
+        if (text && mode === "focus" && !busy && !vEl.classList.contains("is-on") && performance.now() - lastAct > 4000 && !wiping) voice.say(text, Math.min(7, 2.6 + text.length / 22));
+      } finally { idleBusy = false; }
+    }, 1000);
     const ignored = () => {
       if (!voice || mode !== "focus") return;
       played++;
@@ -467,8 +483,14 @@
     const ink = window.Ink ? new Ink({ lang: LANG,
       // only a real attempt to say something gets an answer; playing with the glass is left in peace,
       // with a gentle reminder now and then of what the glass can do
-      onInk: () => {},
-      onIgnore: () => {},
+      onInk: (input) => {
+        if (window.__pp) (window.__inks = window.__inks || []).push(input);
+        if (!voice || !voice.deliberate(input)) return ignored();
+        played = 0;
+        voice.typing(20);
+        handle(input);
+      },
+      onIgnore: () => ignored(),
     }) : null;
     let wrote = false, lastHint = 0, introEnd = Infinity;
     el.addEventListener("pointerdown", (e) => {
@@ -485,6 +507,8 @@
       if (ink && rain.finger) ink.move(e.clientX, e.clientY);
       const over = mode === "focus" && !!e.target.closest(".hero");
       tip.classList.toggle("is-on", over);
+      // until someone writes, the voice keeps inviting them to
+      if (over && !wrote && hints < 2 && voice && !vEl.classList.contains("is-on") && performance.now() - lastHint > 9000 && performance.now() > introEnd) { lastHint = performance.now(); hints++; voice.say(voice.step ? voice.nudge() : voice.opener(), 5.5); }
       const d = Math.round(rain.fingerRadius() * 2);
       if (tip._d !== d) { tip._d = d; Object.assign(tip.style, { width: d + "px", height: d + "px", margin: `${-d / 2}px 0 0 ${-d / 2}px` }); }
       tx(e.clientX); ty(e.clientY);
@@ -551,7 +575,7 @@
       try { const st = JSON.parse(localStorage.getItem("pp-rain-tune-3") || "null"); if (st) Object.assign(rain.P, st); } catch (e) {}
       import("/assets/js/tune.js").then((m) => m.tune(rain, (mode) => {
         const at = typeof mode === "number" ? mode : { dawn: 0, day: 0.2, dusk: 0.62, night: 1 }[mode];
-        if (at !== undefined) CLOCK.h = { 0: 7, 0.2: 12, 0.62: 19, 1: 23.5 }[at] ?? CLOCK.h;
+        if (at !== undefined) { DAY.t = DAY.v = at; DAY.n = DAY.nv = 0; }
         if (typeof mode !== "number") setStorm(mode === "storm" ? 1 : 0);
       }));
       window.rain = rain;
@@ -571,23 +595,25 @@
     // once everything has loaded and settled, the voice says hello
     const greet = () => gsap.delayedCall(reduce ? 0.3 : 1.5, () => {
       introEnd = performance.now();
-      if (voice && mode === "focus" && !wrote) { lastHint = performance.now(); const H = { ca: ["Hola", "Escriu al vidre amb el dit: qui hi hagi a l’altra banda ho veurà."], es: ["Hola", "Escribe en el cristal con el dedo: quien esté al otro lado lo verá."], en: ["Hi", "Write on the glass with your finger: whoever is on the other side will see it."] }[LANG] || ["Hi", ""];
-        if (!(presence && presence.count())) voice.say(presence && presence.name ? `${H[0]}, ${presence.name}. ${H[1]}` : H[1], 7); }
+      DAY.run = true;
+      if (voice && mode === "focus" && !wrote) { lastHint = performance.now(); voice.say(voice.opener(), 7.5); }
     });
-    return { rain, day, slope, voice, greet, hour: () => hourNow, wiping: () => wiping, KEYS, lerp, ink, el, live };
+    // the brain starts waking at once (the loading screen waits for it); ?nobrain skips it, for tests
+    const noBrain = /[?&]nobrain\b/.test(location.search);
+    // the model wakes with the page, under the loading screen, so the voice is ready the moment you arrive;
+    // if someone skips ahead, the written lines answer until it is ready, without a word about it
+    if (voice && !noBrain) voice.wake();
+    // a guard for any machine: if the model makes the window stutter for several seconds, it is let go,
+    // and the written lines carry the conversation on
+    let heavy = 0;
+    setInterval(() => {
+      const b = voice && voice.brain, ad = rain && rain.ad;
+      if (!b || b.off || !b.w || !ad || document.hidden) { heavy = 0; return; }
+      heavy = ad.ema > 40 ? heavy + 1 : 0;
+      if (heavy >= 5) { try { b.w.terminate(); } catch (e) {} b.off = true; b.ready = false; b.status = "let go: too heavy for this machine"; console.info("[cervell] let go: the window was stuttering"); }
+    }, 1000);
+    return { rain, day, slope, voice, greet, hour: () => hourNow, wiping: () => wiping };
   })();
-
-  // the hour → a place on the landing's light curve (07:00 … 24:00 … 07:00)
-  const dOf = (h) => { const K = hero.KEYS; if (!K) return 0; let x = h < 7 ? h + 24 : h; for (let i = 0; i < K.length - 1; i++) if (x >= K[i].h && x <= K[i + 1].h) return K[i].at + ((x - K[i].h) / (K[i + 1].h - K[i].h)) * (K[i + 1].at - K[i].at); return 0; };
-  function light(h) {
-    const d = dOf(h);
-    if (hero.day) hero.day(d);
-    // the other windows get the same light as the landing's
-    if (wall && wall.rain && hero.rain) { const a = hero.rain.state, b = wall.rain.state; b.night = a.night; b.storm = a.storm; b.sun = a.sun; Object.assign(b.grade, a.grade); b.grade.tint = a.grade.tint.slice(); b.grade.lift = a.grade.lift.slice(); b.grade.glow = a.grade.glow.slice(); }
-    // only when it really changes: a custom property on the root makes the browser recheck every element
-    const nt = (hero.rain ? hero.rain.state.night : 0).toFixed(2), br = (hero.rain ? Math.min(1, hero.rain.state.grade.bright / 0.86) : 1).toFixed(2);
-    if (wall && (nt !== light.nt || br !== light.br)) { light.nt = nt; light.br = br; wall.sec.style.setProperty("--night", nt); wall.sec.style.setProperty("--lit", br); }
-  }
 
   /* ---------------- the preview that follows the pointer over lists ---------------- */
   const preview = (() => {
@@ -656,398 +682,75 @@
     } });
   };
 
-  /* ---------------- work: prints taped to the window, a wall without end ---------------- */
-  const wall = (() => {
-    const sec = $(".wall");
-    if (!sec || !window.Wall || !window.Rain || !Rain.supported) { if (sec) sec.classList.add("no-gl"); return null; }
-    const w = new Wall(sec, { reduce, touch, lang: LANG, cursor, sound: () => window.Sound,
-      onOpen: (slug) => { caseOpen = slug; html.setAttribute("data-case-open", ""); if (TITLES.cases && TITLES.cases[slug]) d.title = TITLES.cases[slug]; },
-      onClose: () => { caseOpen = null; html.removeAttribute("data-case-open"); if (TITLES[current]) d.title = TITLES[current]; if (location.pathname !== pathOf("work")) history.pushState({}, "", pathOf("work")); },
-      onPick: (slug) => { if (location.pathname !== pathOf("work", slug)) history.pushState({}, "", pathOf("work", slug)); } });
-    if (/[?&]test(&|$)/.test(location.search)) window.__wall = w;
-    return w;
-  })();
-
-  /* ---------------- the other side of the glass ----------------
-     Whoever else is on the site at this moment is behind the same window (on the landing, and on the work). Their
-     pointer, their name and what they say are clean interface elements placed behind the glass: wherever the glass
-     is frosted they are blurred and faint, and where it has been wiped they are sharp. So you always see that
-     someone is there and roughly what they do, but to read them you wipe the frost away.
-     Enter opens a pane by your pointer, the same pane they will see by theirs; Shift, a row of signs; two quick
-     presses knock on the glass; a finger held still breathes on it; two fingers on the same spot warm it. */
-  presence = (() => {
-    const T = {
-      ca: { someone: "Algú", join: (n) => `${n} és a l’altra banda del vidre.`, leave: (n) => `${n} se n’ha anat.`, knock: (n) => `${n} truca al vidre!`, wrote: (n) => `${n} t’ha escrit. Desentela el vidre per llegir-ho.`, alone: "Ara mateix no hi ha ningú a l’altra banda.", ph: "Escriu i prem Enter", toc: "toc toc", hint: "Enter per escriure. Shift per un signe. Dos tocs per trucar.", write: "Escriu" },
-      es: { someone: "Alguien", join: (n) => `${n} está al otro lado del cristal.`, leave: (n) => `${n} se ha ido.`, knock: (n) => `¡${n} llama al cristal!`, wrote: (n) => `${n} te ha escrito. Desempaña el cristal para leerlo.`, alone: "Ahora mismo no hay nadie al otro lado.", ph: "Escribe y pulsa Enter", toc: "toc toc", hint: "Enter para escribir. Shift para un signo. Dos toques para llamar.", write: "Escribir" },
-      en: { someone: "Someone", join: (n) => `${n} is on the other side of the glass.`, leave: (n) => `${n} has gone.`, knock: (n) => `${n} is knocking!`, wrote: (n) => `${n} wrote to you. Wipe the glass to read it.`, alone: "Nobody is on the other side right now.", ph: "Type and press Enter", toc: "knock knock", hint: "Enter to write. Shift for a sign. Two taps to knock.", write: "Write" },
-    }[LANG] || {};
-    // six small signs, solid, cut clean like the rest of the interface (Phosphor Icons, fill, MIT licence)
-    const ICON = {"wave":"M219.31,98.46A88,88,0,1,1,67.08,186.77h0L26.15,115.88a16,16,0,0,1,27.69-16L72.4,132a8,8,0,0,0,13.86-8L47,56A16,16,0,0,1,74.69,40L114,108a8,8,0,1,0,13.85-8l-30-52a16,16,0,0,1,27.71-16L166,102.12A48.25,48.25,0,0,0,152,136a47.59,47.59,0,0,0,9.6,28.8,8,8,0,1,0,12.79-9.61A32,32,0,0,1,181,110.26a8,8,0,0,0,2.17-10.43L171.71,80a16,16,0,0,1,27.71-16l19.89,34.46Zm-29.37-57A43.74,43.74,0,0,1,216.74,62l.33.57a8,8,0,0,0,13.86-8L230.6,54a59.64,59.64,0,0,0-36.54-28,8,8,0,0,0-4.12,15.46ZM79.58,225.72A103.58,103.58,0,0,1,53.93,196a8,8,0,0,0-13.86,8,119.56,119.56,0,0,0,29.6,34.28,8,8,0,0,0,9.91-12.56Z","heart":"M240,102c0,70-103.79,126.66-108.21,129a8,8,0,0,1-7.58,0C119.79,228.66,16,172,16,102A62.07,62.07,0,0,1,78,40c20.65,0,38.73,8.88,50,23.89C139.27,48.88,157.35,40,178,40A62.07,62.07,0,0,1,240,102Z","smile":"M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24ZM92,96a12,12,0,1,1-12,12A12,12,0,0,1,92,96Zm82.92,60c-10.29,17.79-27.39,28-46.92,28s-36.63-10.2-46.92-28a8,8,0,1,1,13.84-8c7.47,12.91,19.21,20,33.08,20s25.61-7.1,33.08-20a8,8,0,1,1,13.84,8ZM164,120a12,12,0,1,1,12-12A12,12,0,0,1,164,120Z","thumbs":"M234,80.12A24,24,0,0,0,216,72H160V56a40,40,0,0,0-40-40,8,8,0,0,0-7.16,4.42L75.06,96H32a16,16,0,0,0-16,16v88a16,16,0,0,0,16,16H204a24,24,0,0,0,23.82-21l12-96A24,24,0,0,0,234,80.12ZM32,112H72v88H32Z","fire":"M143.38,17.85a8,8,0,0,0-12.63,3.41l-22,60.41L84.59,58.26a8,8,0,0,0-11.93.89C51,87.53,40,116.08,40,144a88,88,0,0,0,176,0C216,84.55,165.21,36,143.38,17.85Zm40.51,135.49a57.6,57.6,0,0,1-46.56,46.55A7.65,7.65,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z","spark":"M208,144a15.78,15.78,0,0,1-10.42,14.94L146,178l-19,51.62a15.92,15.92,0,0,1-29.88,0L78,178l-51.62-19a15.92,15.92,0,0,1,0-29.88L78,110l19-51.62a15.92,15.92,0,0,1,29.88,0L146,110l51.62,19A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"};
-    const EMO = Object.keys(ICON);
-    const svg = (k) => `<svg viewBox="0 0 256 256" aria-hidden="true"><path d="${ICON[k]}"/></svg>`;
-    const ARROW = `<svg class="peer__arrow" viewBox="0 0 16 22" aria-hidden="true"><path d="M1.5 1.5v16.4l4.3-4.1 2.9 6.6 2.9-1.3-2.8-6.4h6.1z"/></svg>`;
-    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const others = new Map();
-    let share = null, me = { x: innerWidth / 2, y: innerHeight / 2, has: false }, myName = "", toldWrote = false, toldHint = false;
-    try { myName = (localStorage.getItem("pp-name") || "").slice(0, 18); } catch (e) {}
-    const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296; };
-    // a voice of one's own: higher or lower, rounder or thinner, steadier or shakier
-    const voiceOf = (id, x = 0) => { const a = hash(id + "a"), b = hash(id + "b"), c = hash(id + "c"); return { key: id, pitch: -6 + a * 11, form: 0.86 + b * 0.3, wob: 0.6 + c * 1.1, range: 0.8 + a * 0.45, fm: 0.7 + c * 0.7, x }; };
-    const durOf = (n) => Math.min(2.8, 0.034 * n + 0.25), holdOf = (n) => (5 + Math.min(14, n / 8)) * 1000;
-    // a word from the glass, always in the same calm place at the top
-    const notice = d.createElement("p"); notice.className = "notice"; notice.setAttribute("aria-live", "polite"); d.body.appendChild(notice);
-    const tell = (text, hold = 5) => {
-      notice.textContent = text; notice.classList.add("is-on");
-      if (window.Sound && Sound.on) Sound.voice(text, Math.min(2.4, 0.03 * text.length + 0.2));
-      clearTimeout(notice._t); notice._t = setTimeout(() => notice.classList.remove("is-on"), hold * 1000);
-    };
-    // only the windows are shared: the landing and the work
-    const place = () => (busy ? null : mode === "page" && current === "work" && !caseOpen ? "work" : mode === "focus" && Z.center === "home" ? "home" : null);
-    const glassOf = (p) => (p === "home" ? hero.rain : p === "work" && wall ? wall.rain : null);
-    const hostOf = (p) => (p === "home" ? hero.el : p === "work" && wall ? wall.sec : null);
-    const enc = (cx, cy) => {
-      const p = place(), o = { p };
-      if (p === "work" && wall) { const w = wall.toWorld(cx, cy); o.x = +w[0].toFixed(4); o.y = +w[1].toFixed(4); }
-      else { o.x = +(cx / innerWidth).toFixed(4); o.y = +(cy / innerHeight).toFixed(4); }
-      return o;
-    };
-    // their point on my screen; the landing is seen from the other side of the pane, so it is mirrored
-    const dec = (m) => {
-      const p = place();
-      if (!m || !m.p || m.p !== p) return null;
-      if (p === "home") return { x: (1 - m.x) * innerWidth, y: m.y * innerHeight };
-      if (p === "work" && wall) { const s = wall.toScreen(m.x, m.y); return { x: s[0], y: s[1] }; }
-      return null;
-    };
-    const nameOf = (o) => o.name || (others.size > 1 ? `${T.someone} ${o.slot + 1}` : T.someone);
-
-    // ---- a person, out there behind the glass: their pointer and one card beside it (the name; the words open under it).
-    //      Drawn here in 2D at the screen's resolution and handed to the glass, which looks at it through its frost and its
-    //      drops like at anything else out there: blurred where it is frosted, bent through the water, sharp where wiped ----
-    const P2D = Object.fromEntries(EMO.map((k) => [k, new Path2D(ICON[k])]));
-    const AR = new Path2D("M1.5 1.5v16.4l4.3-4.1 2.9 6.6 2.9-1.3-2.8-6.4h6.1z");
-    // each person is drawn into their own tile of a small atlas (the tip of the pointer at the tile's corner); the glass
-    // places the tiles where the people are, so moving costs nothing and only a change of what they show is sent up
-    const TW = 340, TH = 250, TP = 4;
-    const lc = d.createElement("canvas"), lx = lc.getContext("2d");
-    let LS = 1, drawn = false;
-    const sizeL = () => { LS = Math.min(devicePixelRatio || 1, 2); lc.width = Math.round(TW * 4 * LS); lc.height = Math.round(TH * LS); lastKey = ""; };
-    const TILE = new Float32Array(16);
-    const F = { name: "500 10.5px 'Chivo Mono', monospace", text: "500 14.5px 'Inter Tight', sans-serif" };
-    const wrapT = (text, max) => { lx.font = F.text; const out = []; let line = ""; for (const w of text.split(" ")) { const t = line ? line + " " + w : w; if (lx.measureText(t).width > max && line) { out.push(line); line = w; } else line = t; } if (line) out.push(line); return out.slice(0, 6); };
-    const get = (id) => {
-      if (others.has(id)) return others.get(id);
-      const used = new Set([...others.values()].map((o) => o.slot)), slot = [0, 1, 2, 3, 4, 5].find((i) => !used.has(i));
-      const o = { id, slot, name: "", m: null, x: -999, y: -999, tx: -999, ty: -999, seen: 0, last: performance.now(), voice: voiceOf(id), say: null, stack: 0, cw: 0, ch: 0, press: 0 };
-      others.set(id, o);
-      return o;
-    };
-    const paint = () => {};
-    // my card changes size by gliding from what it was to what it becomes
-    function resize(card, change) {
-      const w0 = card.offsetWidth, h0 = card.offsetHeight;
-      change();
-      if (reduce || !w0) return;
-      const w1 = card.offsetWidth, h1 = card.offsetHeight;
-      if (Math.abs(w1 - w0) < 1 && Math.abs(h1 - h0) < 1) return;
-      gsap.killTweensOf(card, "width,height");
-      gsap.fromTo(card, { width: w0, height: h0 }, { width: w1, height: h1, duration: 0.55, ease: "expo.out", clearProps: "width,height" });
+  /* ---------------- work: a rail of projects you move with the wheel, a drag or a swipe ---------------- */
+  const rail = (() => {
+    const el = $(".wk__rail");
+    if (!el) return { wheel: () => false, layout() {}, key() {} };
+    const items = $$(".wk__item", el), pics = items.map((i) => $(".wk__img img", i));
+    const count = $(".wk__count b"), bar = $(".wk__bar");
+    let target = 0, driving = false, drag = null, dragged = false;
+    const max = () => Math.max(0, el.scrollWidth - el.clientWidth);
+    function layout() {
+      const cap = ($(".wk__cap", el) || { offsetHeight: 24 }).offsetHeight + 10;
+      const pad = parseFloat(getComputedStyle(el).paddingTop) || 0;
+      el.style.setProperty("--ih", Math.max(140, el.clientHeight - pad - cap) + "px");
+      target = el.scrollLeft;
+      update();
     }
-    // what their card should be right now: its size and what is in it
-    function layout(o, now) {
-      lx.font = F.name;
-      const name = nameOf(o).toUpperCase(), nw = lx.measureText(name).width, s = o.say;
-      if (!s) { const typingW = o.m && o.m.w ? 22 : 0; return { w: nw + 16 + typingW, h: 22, name, lines: null }; }
-      if (s.icon) return { w: Math.max(nw + 20, 48), h: 26 + 28 + 10, name, icon: s.icon };
-      const lines = s.lines || (s.lines = wrapT(s.text, 268)); lx.font = F.text;
-      return { w: Math.max(nw + 20, Math.max(...lines.map((l) => lx.measureText(l).width)) + 20), h: 26 + lines.length * 19 + 10, name, lines };
-    }
-    let lastDraw = 0, lastKey = "";
-    sizeL(); addEventListener("resize", sizeL);
-    function draw(now, g) {
-      const vis = [...others.values()].filter((o) => o.seen > 0.01 && o.slot < 4);
-      // where the tiles go: every frame, as a uniform
-      TILE.fill(0);
-      for (const o of vis) { const i = o.slot * 4; TILE[i] = (o.x - TP) / innerWidth; TILE[i + 1] = (o.y - TP) / innerHeight; TILE[i + 2] = TW / innerWidth; TILE[i + 3] = TH / innerHeight; }
-      if (g) g.tiles(TILE, LS * innerWidth / Math.max(1, g.c.width));
-      // what is in them: only redrawn when it changes
-      const key = vis.map((o) => [o.slot, Math.round(o.stack), Math.round(o.cw), Math.round(o.ch), (o.seen * 20) | 0, o.press > 0.5 ? 1 : 0, o.say ? (o.say.at | 0) + ":" + Math.ceil(Math.min(1, (now - o.say.at) / 350) * 10) + ":" + Math.ceil(Math.min(1, Math.max(0, now - o.say.at - 120) / (o.say.dur * 1000)) * o.say.text.length) : 0, o.m && o.m.w ? ((now / 180) | 0) : 0, o.name].join(",")).join("|");
-      if (!vis.length || !g) { if (drawn) { for (const r of [hero.rain, wall && wall.rain]) if (r) r.layer(lc, false); drawn = false; lastKey = ""; } return; }
-      for (const r of [hero.rain, wall && wall.rain]) if (r && r !== g) r.layer(lc, false);
-      if (key === lastKey && drawn) return;
-      if (now - lastDraw < 30 && drawn) return;
-      lastKey = key; lastDraw = now;
-      lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, lc.width, lc.height);
-      for (const o of vis) {
-        const L = layout(o, now), k = reduce ? 1 : 0.22;
-        o.cw += (L.w - o.cw) * (o.cw ? k : 1); o.ch += (L.h - o.ch) * (o.ch ? k : 1);
-        lx.setTransform(LS, 0, 0, LS, o.slot * TW * LS, 0);
-        lx.save(); lx.beginPath(); lx.rect(0, 0, TW, TH); lx.clip();
-        const x = TP, y = TP, cx = Math.round(x + 12), cy = Math.round(y + 16 + Math.min(o.stack, TH - o.ch - 24));
-        lx.globalAlpha = o.seen;
-        lx.save(); lx.translate(x, y); const pk = 1 - 0.16 * o.press; lx.scale(pk, pk);
-        lx.fillStyle = "#f6f7f2"; lx.strokeStyle = "rgba(12,15,18,0.9)"; lx.lineWidth = 1.15; lx.lineJoin = "round"; lx.fill(AR); lx.stroke(AR); lx.restore();
-        lx.fillStyle = "rgba(12,16,13,0.72)"; lx.fillRect(cx, cy, o.cw, o.ch);
-        lx.strokeStyle = "rgba(244,245,239,0.14)"; lx.lineWidth = 1; lx.strokeRect(cx + 0.5, cy + 0.5, o.cw - 1, o.ch - 1);
-        lx.save(); lx.beginPath(); lx.rect(cx, cy, o.cw, o.ch); lx.clip();
-        const talking = !!o.say, pad = talking ? 10 : 8;
-        lx.font = F.name; lx.textBaseline = "middle"; lx.fillStyle = talking ? "rgba(244,245,239,0.6)" : "#f4f5ef";
-        lx.fillText(L.name, cx + pad, cy + (talking ? 13.5 : 11.5));
-        if (!talking && o.m && o.m.w) { const dx = cx + pad + lx.measureText(L.name).width + 8; for (let i = 0; i < 3; i++) { const a = 0.3 + 0.7 * Math.max(0, Math.sin(now / 180 - i * 0.9)); lx.fillStyle = `rgba(244,245,239,${a.toFixed(2)})`; lx.fillRect(dx + i * 6, cy + 10, 3, 3); } }
-        if (talking && L.icon) {
-          const e = Math.min(1, (now - o.say.at) / 350), s = 28 * (0.6 + 0.4 * (1 - Math.pow(1 - e, 3)));
-          lx.save(); lx.translate(cx + 10 + 14, cy + 26 + 14); lx.scale(s / 256, s / 256); lx.translate(-128, -128); lx.fillStyle = "#f4f5ef"; lx.fill(P2D[L.icon]); lx.restore();
-        } else if (talking && L.lines) {
-          const shown = Math.ceil(Math.min(1, Math.max(0, now - o.say.at - 120) / (o.say.dur * 1000)) * o.say.text.length);
-          lx.font = F.text; lx.textBaseline = "top"; lx.fillStyle = "#f4f5ef";
-          let left = shown;
-          L.lines.forEach((l, i) => { const part = l.slice(0, Math.max(0, left)); left -= l.length + 1; if (part) lx.fillText(part, cx + 10, cy + 26 + i * 19); });
-        }
-        lx.restore(); lx.restore();
-      }
-      lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalAlpha = 1;
-      g.layer(lc, true); drawn = true;
-    }
-    // their words open under their name, at the pace of their voice; after a while the card closes again
-    function hear(o, text, icon) {
-      const n = icon ? 0 : text.length;
-      o.say = { text, icon, at: performance.now(), dur: durOf(n), hold: icon ? 7000 : holdOf(n) + durOf(n) * 1000 };
-    }
-    function knockFx(x, y) {
+    function update() {
+      const m = max(), p = m ? el.scrollLeft / m : 0, frac = el.scrollWidth ? el.clientWidth / el.scrollWidth : 1;
+      bar.style.setProperty("--tw", (frac * 100).toFixed(2) + "%");
+      bar.style.setProperty("--tx", ((p * (1 - frac)) / frac * 100).toFixed(2) + "%");
+      const n = Math.round(p * (items.length - 1)) + 1;
+      if (count.textContent !== String(n).padStart(2, "0")) count.textContent = String(n).padStart(2, "0");
+      // each picture drifts a little inside its frame, so the rail has depth
       if (reduce) return;
-      const NS = "http://www.w3.org/2000/svg", S = 260, box = d.createElementNS(NS, "svg");
-      box.setAttribute("class", "knock"); box.setAttribute("viewBox", `${-S / 2} ${-S / 2} ${S} ${S}`); box.setAttribute("width", S); box.setAttribute("height", S);
-      box.style.transform = `translate3d(${x - S / 2}px, ${y - S / 2}px, 0)`;
-      const el = (n, a) => { const e = d.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); box.appendChild(e); return e; };
-      const tl = gsap.timeline({ onComplete: () => box.remove() });
-      // two knuckles, two sets of rings: thin, broken circles that open out and fade
-      [0, 0.17].forEach((t0, h) => {
-        for (let r = 0; r < 3; r++) {
-          const c = el("circle", { cx: 0, cy: 0, r: 6, fill: "none", stroke: "#f6f7f2", "stroke-width": 1.4, "stroke-dasharray": r === 1 ? "2 5" : r === 2 ? "1 9" : "none", "stroke-linecap": "round" });
-          tl.fromTo(c, { attr: { r: 6 + r * 3 }, opacity: 0.95 - r * 0.2 }, { attr: { r: 34 + r * 22 + h * 6, "stroke-width": 0.5 }, opacity: 0, duration: 0.7 + r * 0.12, ease: "expo.out" }, t0 + r * 0.045);
-        }
+      const r = el.getBoundingClientRect(), mid = r.left + r.width / 2;
+      items.forEach((it, i) => {
+        const b = it.getBoundingClientRect(), off = (b.left + b.width / 2 - mid) / r.width;
+        pics[i].style.transform = `translateX(${(off * -9).toFixed(2)}%)`;
       });
-      // shards of frost: tiny clean slivers that spring off, turn, and drop away
-      for (let i = 0; i < 12; i++) {
-        const a = Math.random() * Math.PI * 2, v = 30 + Math.random() * 45, len = 3 + Math.random() * 5, w = 1 + Math.random() * 1.2;
-        const sh = el("polygon", { points: `0,${-len / 2} ${w},0 0,${len / 2} ${-w},0`, fill: "#f6f7f2", opacity: 0.9 });
-        const dx = Math.cos(a) * v, dy = Math.sin(a) * v - 18;
-        tl.fromTo(sh, { x: Math.cos(a) * 8, y: Math.sin(a) * 8, rotation: (a * 180) / Math.PI, opacity: 0.95, svgOrigin: "0 0" },
-          { keyframes: { x: [Math.cos(a) * 8, dx * 0.8, dx], y: [Math.sin(a) * 8, dy * 0.75, dy + 70 + Math.random() * 40], easeEach: "power1.out" }, rotation: "+=" + (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * 200), opacity: 0, duration: 0.95 + Math.random() * 0.4, ease: "none" }, Math.random() * 0.08 + (i % 2) * 0.17);
-      }
-      d.body.appendChild(box);
     }
-    // glass shivers: a few stiff, quick, small movements that die at once (never a wobble)
-    const shiver = (el, k = 1) => {
-      if (reduce || !el) return;
-      const a = 2.2 * k;
-      gsap.killTweensOf(el, "x,y");
-      gsap.timeline().to(el, { x: -a, y: a * 0.35, duration: 0.03, ease: "none" }).to(el, { x: a * 0.8, y: -a * 0.25, duration: 0.03, ease: "none" })
-        .to(el, { x: -a * 0.5, y: a * 0.15, duration: 0.035, ease: "none" }).to(el, { x: a * 0.25, y: 0, duration: 0.04, ease: "none" }).to(el, { x: 0, y: 0, duration: 0.05, ease: "power1.out" });
-    };
-    function knockHere(p, sx, sy, k = 1, word) {
-      const g = glassOf(p); if (!g) return;
-      knockFx(sx * innerWidth, sy * innerHeight);
-      g.knock(sx, sy, k);
-      shiver(hostOf(p), k);
-      if (window.Sound) Sound.knock(sx * 2 - 1, k);
-    }
-    const connect = () => import("/assets/js/shared.js?v=" + ((($('script[src*="main.js"]') || {}).src || "").split("v=")[1] || "")).then((m) => m.share({
-      join(id) {
-        get(id);
-        if (myName && share) share.name(myName, id);
-        if (share) share.clock({ h: CLOCK.h, born: CLOCK.born }, id);
-        sendNow();
-        gsap.delayedCall(1.4, () => { const o = others.get(id); if (o && !o.told) { o.told = true; tell(T.join(nameOf(o)), 5); if (!toldHint) { toldHint = true; gsap.delayedCall(6, () => others.size && tell(T.hint, 6)); } } });
-      },
-      leave(id) { const o = others.get(id); if (!o) return; o.gone = true; tell(T.leave(nameOf(o)), 4); },
-      name(id, n) { const o = get(id); o.name = String(n).replace(/[<>]/g, "").trim().slice(0, 18); },
-      // the hour of the window: the one who has been here longest keeps it; the others glide to it
-      clock(id, c) {
-        if (!c || typeof c.h !== "number" || typeof c.born !== "number" || c.born >= CLOCK.born) return;
-        CLOCK.born = c.born;
-        const dh = ((c.h - CLOCK.h + 36) % 24) - 12;
-        if (Math.abs(dh) < 0.05) return;
-        gsap.to(CLOCK, { h: "+=" + dh, duration: reduce ? 0 : 2.5, ease: "sine.inOut", onComplete: () => (CLOCK.h = (CLOCK.h + 24) % 24) });
-      },
-      pointer(id, m) {
-        const o = get(id), prev = o.m; o.m = m; o.last = performance.now();
-        // their fingertip on the glass we share clears the frost here too
-        const g = glassOf(place());
-        if (g && m.d) { const a = dec(m), b = prev && prev.d && prev.p === m.p ? dec(prev) : a; if (a && b) g.wipe(b.x / innerWidth, b.y / innerHeight, a.x / innerWidth, a.y / innerHeight); }
-      },
-      breath(id, m) { const a = dec(m), g = glassOf(place()); if (a && g) g.breathe(a.x / innerWidth, a.y / innerHeight, 0.06); },
-      emoji(id, m) { this.chat(id, { ...m, r: m.e }); },
-      chat(id, m) {
-        const o = get(id), icon = ICON[m.r] ? m.r : null, t = icon ? "" : String(m.t || "").replace(/\s+/g, " ").trim().slice(0, 140), a = dec(m);
-        if (!t && !icon) return;
-        if (m.p) { o.m = { ...(o.m || {}), p: m.p, x: m.x, y: m.y }; o.last = performance.now(); }
-        hear(o, t, icon);
-        if (window.Sound && Sound.on) { if (icon) { if (Sound.typeKeys) Sound.typeKeys(2, 0.1); } else Sound.voice(t, durOf(t.length), { ...o.voice, x: a ? (a.x / innerWidth) * 2 - 1 : 0 }); }
-        if (!toldWrote && a) { toldWrote = true; gsap.delayedCall(durOf(t.length) + 0.6, () => { const g = glassOf(place()); if (g && g.fogAt((o.x + 80) / innerWidth, (o.y + 40) / innerHeight) > 0.45) tell(T.wrote(nameOf(o)), 6); }); }
-      },
-      knock(id, m) {
-        const o = get(id), a = dec(m); if (!a) return;
-        knockHere(m.p, a.x / innerWidth, a.y / innerHeight, 0.9, true);
-        if (!o.knockTold || performance.now() - o.knockTold > 20000) { o.knockTold = performance.now(); tell(T.knock(nameOf(o)), 3.5); }
-      },
-    })).then((s) => { share = s; if (myName) s.name(myName); sendNow(); if (/[?&]test\b/.test(location.search)) window.__share = { s, others }; }).catch((e) => console.info("[glass] alone today:", e && e.message));
-    if (!/[?&]solo\b/.test(location.search) && "WebSocket" in window) connect();
-
-    // ---- telling them what I do ----
-    const pressing = () => { const g = glassOf(place()); return g && g.finger ? 1 : 0; };
-    const sendNow = () => { if (!share || !share.count || !me.has || !place()) return; share.pointer({ ...enc(me.x, me.y), d: pressing(), w: chatOn ? 1 : 0 }); };
-    let still = { x: 0, y: 0, t: 0, sent: 0 }, breathing = 0;
-    addEventListener("pointermove", (e) => { me.x = e.clientX; me.y = e.clientY; me.has = true; if (Math.hypot(e.clientX - still.x, e.clientY - still.y) > 4) { still.x = e.clientX; still.y = e.clientY; still.t = performance.now(); } sendNow(); }, { passive: true });
-    addEventListener("pointerdown", (e) => { me.x = still.x = e.clientX; me.y = still.y = e.clientY; still.t = performance.now(); me.has = true; requestAnimationFrame(sendNow); }, { passive: true });
-    addEventListener("pointerup", () => requestAnimationFrame(sendNow), { passive: true });
-    setInterval(sendNow, 2000);
-    setInterval(() => { if (share && share.count) share.clock({ h: CLOCK.h, born: CLOCK.born }); }, 8000);
+    el.addEventListener("scroll", () => { if (!driving) target = el.scrollLeft; update(); }, { passive: true });
+    // the title above fits itself to the width, so the rail's height is only known after it
+    new ResizeObserver(() => layout()).observe(el);
     gsap.ticker.add(() => {
-      const now = performance.now(), p = place(), g = glassOf(p);
-      // a finger held still on the glass breathes on it
-      if (g && g.finger && now - still.t > 650) {
-        g.breathe(me.x / innerWidth, me.y / innerHeight, 0.05);
-        if ((!breathing || now - breathing > 1000) && window.Sound) { Sound.breath((me.x / innerWidth) * 2 - 1, breathing ? 0.8 : 1); breathing = now; }
-        if (share && share.count && now - still.sent > 140) { still.sent = now; share.breath(enc(me.x, me.y)); }
-      } else breathing = 0;
-      if (!others.size) { draw(now, null); return; }
-      for (const [id, o] of others) {
-        const pos = o.gone || now - o.last > 30000 ? null : dec(o.m);
-        o.seen += ((pos && g ? 1 : 0) - o.seen) * 0.12;
-        if (pos) { if (o.tx < -900) { o.x = pos.x; o.y = pos.y; } o.tx = pos.x; o.ty = pos.y; }
-        o.x += (o.tx - o.x) * 0.3; o.y += (o.ty - o.y) * 0.3;
-        o.press += ((o.m && o.m.d ? 1 : 0) - o.press) * 0.3;
-        if (o.say && now - o.say.at > o.say.hold) o.say = null;
-        // the same spot, at the same time, from both sides
-        if (pos && g && g.finger && o.m && o.m.d && Math.hypot(o.x - me.x, o.y - me.y) < 46 && now - (o.touched || 0) > 6000) {
-          o.touched = now; g.warm(me.x / innerWidth, me.y / innerHeight); if (window.Sound) Sound.chime((me.x / innerWidth) * 2 - 1);
-        }
-        if (o.gone && o.seen < 0.01) others.delete(id);
-      }
-      // cards close to each other stack downwards instead of covering each other
-      const list = [...others.values()].filter((o) => o.seen > 0.05).sort((a, b) => a.y - b.y);
-      for (let i = 0; i < list.length; i++) {
-        const o = list[i]; let push = 0;
-        for (let j = 0; j < i; j++) {
-          const p = list[j], ox = o.x + 12, oy = o.y + 16 + push, px2 = p.x + 12, py2 = p.y + 16 + p.stack;
-          if (ox < px2 + p.cw && ox + o.cw > px2 && oy < py2 + p.ch + 6 && oy + o.ch > py2) push = py2 + p.ch + 6 - (o.y + 16);
-        }
-        o.stack += (push - o.stack) * 0.25;
-      }
-      draw(now, g);
+      if (!driving) return;
+      const d = target - el.scrollLeft;
+      if (Math.abs(d) < 0.5) { el.scrollLeft = target; driving = false; return; }
+      el.scrollLeft += d * (reduce ? 1 : 0.1);
     });
-
-    // ---- knocking: two quick presses in the same place, with a mouse or a finger ----
-    let lastKnock = 0, tap = { t: 0, x: 0, y: 0 };
-    const knockAt = (cx, cy) => { const p = place(); if (!glassOf(p) || performance.now() - lastKnock < 400) return; lastKnock = performance.now(); knockHere(p, cx / innerWidth, cy / innerHeight); if (share) share.knock(enc(cx, cy)); };
-    d.addEventListener("pointerdown", (e) => {
-      if (e.button || !e.target.closest(".hero, .wall") || e.target.closest(".pin, .wall__case, a, button, input")) return;
-      const now = performance.now();
-      if (now - tap.t < 340 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 26) { knockAt(e.clientX, e.clientY); tap.t = 0; }
-      else tap = { t: now, x: e.clientX, y: e.clientY };
-    }, true);
-
-    // ---- my card: the same card as theirs, by my pointer, without my name (it is me). Enter opens it to write; it follows
-    //      the pointer while I write and while my words stay; clicking or wiping the glass never loses what I am writing ----
-    const typing = (e) => e.target.closest && e.target.closest("input, textarea, select, [contenteditable]");
-    const mine = d.createElement("div"); mine.className = "card card--mine";
-    mine.innerHTML = `<div class="card__msg"><div class="card__t"></div><input class="card__in" maxlength="140" autocomplete="off" enterkeyhint="send" spellcheck="false" aria-label="${esc(T.ph)}" placeholder="${esc(T.ph)}"></div>`;
-    d.body.appendChild(mine);
-    const mT = mine.querySelector(".card__t"), input = mine.querySelector(".card__in");
-    let chatOn = false, mineEnd = null;
-    const mx = gsap.quickTo(mine, "x", { duration: 0.3, ease: "power3" }), my = gsap.quickTo(mine, "y", { duration: 0.3, ease: "power3" });
-    const at = () => [Math.min((me.has ? me.x : innerWidth / 2) + 12, innerWidth - 300), Math.min((me.has ? me.y : innerHeight * 0.6) + 16, innerHeight - 80)];
-    gsap.set(mine, { x: at()[0], y: at()[1] });
-    addEventListener("pointermove", () => { const [x, y] = at(); if (mine.classList.contains("is-on")) { mx(x); my(y); } else gsap.set(mine, { x, y }); }, { passive: true });
-    const mineOpen = (mode) => {
-      if (mineEnd) { mineEnd.kill(); mineEnd = null; }
-      const was = mine.classList.contains("is-on");
-      resize(mine, () => { mine.classList.add("is-on"); mine.classList.toggle("is-edit", mode === "edit"); mine.classList.toggle("is-icon", mode === "icon"); });
-      if (!was && !reduce) gsap.fromTo(mine, { opacity: 0, scale: 0.94, transformOrigin: "0 0" }, { opacity: 1, scale: 1, duration: 0.4, ease: "expo.out" });
-      html.classList.add("is-saying");
+    const go = (t) => { target = gsap.utils.clamp(0, max(), t); driving = true; };
+    // the wheel moves the rail; at its start, scrolling up hands over to the camera
+    const wheel = (dy) => {
+      if (dy < 0 && target <= 0.5 && el.scrollLeft <= 1) return false;
+      go(target + dy);
+      return true;
     };
-    const mineClose = (after = 0) => {
-      if (mineEnd) mineEnd.kill();
-      mineEnd = gsap.delayedCall(after, () => {
-        mineEnd = null;
-        const done = () => { mine.classList.remove("is-on", "is-edit", "is-icon"); mT.textContent = ""; html.classList.remove("is-saying"); gsap.set(mine, { opacity: 1, scale: 1 }); };
-        if (reduce) done(); else gsap.to(mine, { opacity: 0, scale: 0.96, duration: 0.3, ease: "power2.in", onComplete: done });
-      });
-    };
-    const openChat = () => {
-      if (!place()) return;
-      if (!share || !share.count) { tell(T.alone, 3); return; }
-      chatOn = true; input.value = ""; mineOpen("edit"); input.focus({ preventScroll: true }); sendNow();
-    };
-    const stopChat = () => { chatOn = false; input.blur(); sendNow(); };
-    addEventListener("keydown", (e) => {
-      if (chatOn || typing(e) || e.metaKey || e.ctrlKey || e.altKey || d.getElementById("loader")) return;
-      if (e.key === "Enter" || e.key === "/") { e.preventDefault(); openChat(); }
+    const key = (dir) => go(target + dir * (items[0].offsetWidth + 14));
+    el.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "mouse" || e.button) return;
+      drag = { x: e.clientX, t: target }; dragged = false;
     });
-    // writing is never lost to a click on the glass: the field takes the keys back
-    addEventListener("pointerup", () => { if (chatOn) requestAnimationFrame(() => input.focus({ preventScroll: true })); }, { passive: true });
-    input.addEventListener("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Escape") { e.preventDefault(); stopChat(); mineClose(0); return; }
-      if (e.key !== "Enter" || e.isComposing) return;
-      e.preventDefault();
-      const t = input.value.replace(/\s+/g, " ").trim().slice(0, 140);
-      stopChat();
-      if (!t) { mineClose(0); return; }
-      const x = me.has ? me.x : innerWidth / 2, y = me.has ? me.y : innerHeight / 2;
-      if (share) share.chat({ ...enc(x, y), t });
-      resize(mine, () => { mT.textContent = t; mine.classList.remove("is-edit"); });
-      if (window.Sound && Sound.on) Sound.voice(t, durOf(t.length), voiceOf(share ? share.id : "me", (x / innerWidth) * 2 - 1));
-      mineClose(holdOf(t.length) / 1000 + 0.6);
-    });
-
-    // ---- Shift: a short row of signs over the pointer; slide to one and let go ----
-    const ring = d.createElement("div"); ring.className = "emo"; ring.setAttribute("aria-hidden", "true");
-    ring.innerHTML = `<div class="emo__row">${EMO.map((k) => `<button type="button" tabindex="-1" data-e="${k}">${svg(k)}</button>`).join("")}</div>`;
-    d.body.appendChild(ring);
-    const tiles = [...ring.querySelectorAll("button")];
-    let ringOn = false, pick = null, rx = 0, ry = 0;
-    const sendFace = (k) => {
-      const x = me.has ? me.x : innerWidth / 2, y = me.has ? me.y : innerHeight / 2;
-      if (chatOn) stopChat();
-      mT.innerHTML = svg(k); mineOpen("icon");
-      if (!reduce) gsap.fromTo(mT.firstChild, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(2)" });
-      mineClose(5);
-      if (window.Sound && Sound.on && Sound.typeKeys) Sound.typeKeys(2, 0.1);
-      if (share) share.chat({ ...enc(x, y), r: k });
-    };
-    const setPick = (b) => { if (b === pick) return; pick = b; tiles.forEach((t) => t.classList.toggle("is-pick", t === b)); if (b && window.Sound && Sound.on && Sound.typeKeys) Sound.typeKeys(1, 0.03); };
-    addEventListener("keydown", (e) => {
-      if (e.key !== "Shift" || e.repeat || typing(e) || ringOn || chatOn || !place()) return;
-      ringOn = true; setPick(null); rx = me.has ? me.x : innerWidth / 2; ry = me.has ? me.y : innerHeight / 2;
-      ring.style.transform = `translate3d(${Math.max(150, Math.min(innerWidth - 150, rx))}px, ${Math.max(90, ry)}px, 0)`;
-      ring.classList.add("is-on");
-      if (!reduce) gsap.fromTo(tiles, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out", stagger: 0.025, overwrite: true });
-    });
-    addEventListener("keyup", (e) => { if (e.key !== "Shift" || !ringOn) return; ringOn = false; ring.classList.remove("is-on"); if (pick) sendFace(pick.dataset.e); setPick(null); });
     addEventListener("pointermove", (e) => {
-      if (!ringOn) return;
-      const r = ring.firstChild.getBoundingClientRect();
-      if (e.clientY < r.top - 40 || e.clientY > r.bottom + 70 || e.clientX < r.left - 30 || e.clientX > r.right + 30) { setPick(null); return; }
-      const i = Math.max(0, Math.min(tiles.length - 1, Math.floor(((e.clientX - r.left) / r.width) * tiles.length)));
-      setPick(Math.abs(e.clientX - rx) > 8 || e.clientY < ry - 8 ? tiles[i] : null);
-    }, { passive: true });
-    ring.addEventListener("pointerdown", (e) => { const b = e.target.closest("button"); if (b) { e.preventDefault(); sendFace(b.dataset.e); ringOn = false; ring.classList.remove("is-on"); setPick(null); } });
-    // on a phone: a small button to write, only when someone is on the other side
-    const btn = d.createElement("button"); btn.type = "button"; btn.className = "chatbtn mono"; btn.textContent = T.write; d.body.appendChild(btn);
-    btn.addEventListener("click", openChat);
-    setInterval(() => btn.classList.toggle("is-on", !!(share && share.count && place())), 1000);
-    return {
-      count: () => others.size,
-      setName(n) { myName = (n || "").replace(/[<>]/g, "").trim().slice(0, 18); try { localStorage.setItem("pp-name", myName); } catch (e) {} if (share && myName) share.name(myName); },
-      get name() { return myName; },
-    };
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      if (Math.abs(dx) > 5) { dragged = true; el.classList.add("is-drag"); cursor.hide(); }
+      if (dragged) go(drag.t - dx * 1.4);
+    });
+    addEventListener("pointerup", () => { drag = null; el.classList.remove("is-drag"); });
+    el.addEventListener("click", (e) => { if (dragged) { e.preventDefault(); e.stopPropagation(); dragged = false; } }, true);
+    items.forEach((it) => {
+      const link = $(".wk__link", it);
+      link.addEventListener("pointerenter", () => { if (!touch && mode === "page" && !drag) cursor.show(link.closest(".page").dataset.open || ""); });
+      link.addEventListener("pointerleave", () => cursor.hide());
+    });
+    return { wheel, layout, key };
   })();
 
   const PAGE = {
     work: {
-      init() { if (wall) wall.enter(); },
+      init() { rail.layout(); },
     },
     about: {
       init(page) {
@@ -1104,15 +807,35 @@
     wrap.addEventListener("pointerleave", () => { rx(0); ry(0); });
   })();
 
-  /* ---------------- a project opens on the wall itself ---------------- */
+  /* ---------------- case studies ---------------- */
   function openCase(slug, push = true) {
-    if (!wall) return;
-    wall.open(slug);
-    if (push && location.pathname !== pathOf("work", slug)) history.pushState({}, "", pathOf("work", slug));
+    const art = $(`.case[data-slug="${slug}"]`);
+    if (!art) return;
+    const wrap = $("#cases");
+    if (caseOpen && caseOpen !== art) caseOpen.hidden = true;
+    wrap.hidden = false; art.hidden = false; art.scrollTop = 0;
+    caseOpen = art;
+    html.setAttribute("data-case-open", "");
+    preview.hide();
+    if (lenis) lenis.stop();
+    fitAll(art);
+    if (!reduce) gsap.fromTo($(".case__poster", art), { scale: 1.12 }, { scale: 1, duration: 2.2, ease: EO, delay: 0.2 });
+    gsap.fromTo(art, { clipPath: "inset(100% 0% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: reduce ? 0 : 1.1, ease: "power4.inOut" });
+    if (!reduce) gsap.fromTo($(".case__title", art), { yPercent: 40 }, { yPercent: 0, duration: 1.6, ease: EO, delay: 0.35 });
+    $$(".tile", art).forEach((t) => tileIO.observe(t));
+    if (TITLES.cases && TITLES.cases[slug]) d.title = TITLES.cases[slug];
+    if (push) history.pushState({}, "", pathOf("work", slug));
+    $(".case__close", art).focus({ preventScroll: true, focusVisible: false });
   }
   function closeCase(push = true) {
-    if (!wall || !caseOpen) return;
-    wall.close(push);
+    if (!caseOpen) return;
+    const art = caseOpen;
+    caseOpen = null;
+    html.removeAttribute("data-case-open");
+    gsap.to(art, { clipPath: "inset(0% 0% 100% 0%)", duration: reduce ? 0 : 0.8, ease: "power3.inOut", onComplete: () => { art.hidden = true; $("#cases").hidden = true; gsap.set(art, { clearProps: "clipPath" }); } });
+    if (lenis && mode === "page") lenis.start();
+    if (TITLES[current]) d.title = TITLES[current];
+    if (push) history.pushState({}, "", pathOf(current));
   }
 
   /* ---------------- the sentence form ---------------- */
@@ -1243,25 +966,15 @@
         gsap.ticker.remove(tick);
         // the hero logo sits exactly under this one: once the dark lifts, it simply stays
         gsap.set(".hero__title", { visibility: "visible" });
-        if (ni && presence) presence.setName(ni.value);
         const enter = () => { if (window.Sound) Sound.enter(); };
         gsap.timeline({ onComplete: () => { el.remove(); enter(); done(true); } })
           .to(st, { shown: 1, duration: 0.45, ease: "power2.out", onUpdate: put })
-          .to([trace, pct, $(".loader__sound", el), nf], { opacity: 0, duration: 0.5, ease: "power1.out" }, 0.15)
+          .to([trace, pct, skip, $(".loader__sound", el)], { opacity: 0, duration: 0.5, ease: "power1.out" }, 0.15)
           .add(() => { if (introTl) introTl.play(); enter(); }, 0.5)
           .to(el, { backgroundColor: "rgba(5, 6, 5, 0)", duration: reduce ? 0 : 1.3, ease: "power2.inOut" }, 0.5)
           .set($(".loader__logo", el), { opacity: 0 });
       };
-      // your name opens the door: the button wakes when there is one, and Enter (or the button) goes in
-      const nf = $(".loader__name", el), ni = $(".loader__input", el), go = $(".loader__go", el);
-      let named = false;
-      const valid = () => ni.value.replace(/\s+/g, " ").trim().length >= 2;
-      try { ni.value = localStorage.getItem("pp-name") || ""; } catch (e) {}
-      const sync = () => { go.disabled = !valid(); };
-      sync();
-      ni.addEventListener("input", sync);
-      nf.addEventListener("submit", (e) => { e.preventDefault(); if (!valid()) { ni.focus(); gsap.fromTo(ni, { x: -6 }, { x: 0, duration: 0.4, ease: "power3.out" }); return; } named = true; if (presence) presence.setName(ni.value); ni.blur(); go.disabled = true; });
-      gsap.delayedCall(reduce ? 0 : 1.2, () => { el.classList.add("is-asking"); if (!touch) ni.focus({ preventScroll: true }); });
+      skip.addEventListener("click", finish);
       const tick = () => {
         const now = performance.now(), v = hero.voice, b = v && v.brain;
         const scene = hero.rain ? (hero.rain.ready ? 1 : 0) : 1;
@@ -1271,16 +984,15 @@
         st.shown += (st.peak - st.shown) * (reduce ? 1 : 0.06);
         put();
         const n = Math.floor(st.shown * 100);
-        const pb = pct.querySelector("b"); if (pb.textContent !== n + "%") { pb.textContent = n + "%"; el.setAttribute("aria-valuenow", n); }
-        const ready = (st.peak >= 1 && st.shown > 0.985) || now - t0 > 15000;
-        if (ready && !el.classList.contains("is-ready")) el.classList.add("is-ready");
-        if (ready && named && now - t0 > (reduce ? 300 : 1800)) finish();
+        if (pct.textContent !== n + "%") { pct.textContent = n + "%"; el.setAttribute("aria-valuenow", n); }
+        if (now - t0 > 14000) skip.classList.add("is-on");
+        if (st.peak >= 1 && st.shown > 0.985 && now - t0 > (reduce ? 300 : 2100)) finish();
       };
       gsap.ticker.add(tick);
     });
   }
 
-  if (/[?&]test\b/.test(location.search)) window.__pp = { Z, CLOCK, boards, cam, L, get mode() { return mode; }, get busy() { return busy; } };
+  if (/[?&]test\b/.test(location.search)) window.__pp = { Z, DAY, boards, cam, L, get mode() { return mode; }, get busy() { return busy; } };
 
   /* ---------------- start ---------------- */
   layout();
@@ -1296,17 +1008,12 @@
     const now = performance.now();
     if (hero.rain) { hero.rain.active = mode !== "page"; hero.rain.tick(now); }
     if (FXOK) FX.tick(now);
-    // seen from afar the wall breathes slowly, and not at all while the camera is moving
-    if (wall) wall.tick(now, mode === "page" && current === "work" ? 1 : mode === "overview" && Z.v >= 0.999 && !Z.tw && !busy ? 0.25 : 0);
     // the sound follows the scene: rain, wind, hour, storm, the camera pulling back, the fingertip
     if (window.Sound && Sound.on && hero.rain) {
       const r = hero.rain, s = r.state;
-      const fr = mode === "page" && current === "work" && wall && wall.rain ? wall.rain : r;
-      Sound.fingerMove(fr.finger ? fr.fspeed || 0 : 0, fr.finger ? fr.finger.x * 2 - 1 : 0, fr.fturn || 0, now);
+      Sound.fingerMove(r.finger ? r.fspeed || 0 : 0, r.finger ? r.finger.x * 2 - 1 : 0, r.fturn || 0, now);
       if (r.fturn > 0.5) r.fturn = 0.49;
-      const onWall = mode === "page" && current === "work" && wall && wall.rain;
-      if (onWall) Sound.update({ rain: 0, wind: wall.rain.wind.v, gust: wall.rain.wind.gust, night: s.night, storm: 0, hour: hero.hour ? hero.hour() : 12, zoom: 0, page: 0, day: 1, muffle: 0.42, finger: wall.rain.finger ? wall.rain.fspeed || 0 : 0, fx: wall.rain.finger ? wall.rain.finger.x * 2 - 1 : 0 }, now);
-      else Sound.update({ day: 0, rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, hour: hero.hour ? hero.hour() : 12, zoom: Z.v, page: mode === "page" ? 1 : 0, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0 }, now);
+      Sound.update({ rain: s.rain * (1 - s.sun) * (1 + s.storm * 0.8), wind: r.wind.v, gust: r.wind.gust, night: s.night, storm: s.storm, hour: hero.hour ? hero.hour() : 12, zoom: Z.v, page: mode === "page" ? 1 : 0, muffle: mode === "page" ? 1 : Math.min(1, Z.v * 1.2), finger: r.finger ? r.fspeed || 0 : 0, fx: r.finger ? r.finger.x * 2 - 1 : 0 }, now);
     }
   });
   const fontsReady = Promise.race([d.fonts ? d.fonts.ready : Promise.resolve(), new Promise((res) => setTimeout(res, 1600))]);
@@ -1333,6 +1040,7 @@
       layout();
       render();
       fitAll();
+      rail.layout();
       if (mode === "page") ScrollTrigger.refresh();
     }, 120);
   });
