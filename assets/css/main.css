@@ -344,7 +344,7 @@ html:not(.js) .wall__list, .wall.no-gl .wall__list { position: relative; width: 
 .notice { position: fixed; left: 50%; top: calc(var(--bar) + 6px); z-index: 96; margin: 0; padding: 9px 12px 10px; translate: -50% -8px; max-width: min(420px, 86vw); font: 500 15px/1.3 var(--f2); color: #f4f5ef; background: rgba(12, 16, 13, 0.52); border: 1px solid rgba(244, 245, 239, 0.16); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); opacity: 0; pointer-events: none; transition: opacity 0.5s, translate 0.7s var(--ease); }
 .notice { translate: -50% -8px; }
 .notice.is-on { opacity: 1; translate: -50% 0; }
-.notice:not(.is-on), .emo:not(.is-on), .chatbtn:not(.is-on), .pane--mine:not(.is-on) { visibility: hidden; transition-property: opacity, translate, visibility; transition-delay: 0s, 0s, 0.5s; }
+.notice:not(.is-on), .emo:not(.is-on), .chatbtn:not(.is-on) { visibility: hidden; transition-property: opacity, translate, visibility; transition-delay: 0s, 0s, 0.5s; }
 html.is-saying .cursor { opacity: 0; }
 /* the signs: a short row of the interface's own squares over the pointer, white on a dark pane; the one picked fills */
 .emo { position: fixed; left: 0; top: 0; z-index: 97; width: 0; height: 0; pointer-events: none; }
@@ -357,7 +357,7 @@ html.is-saying .cursor { opacity: 0; }
 .emo button.is-pick::before { transform: scaleY(1); }
 .emo button.is-pick { color: #0b0b0b; }
 @media (hover: hover) and (pointer: fine) { .emo button:hover::before { transform: scaleY(1); } .emo button:hover { color: #0b0b0b; } }
-.emo svg, .pane__t svg { width: 22px; height: 22px; fill: currentColor; display: block; transition: transform 0.45s var(--ease); }
+.emo svg { width: 22px; height: 22px; fill: currentColor; display: block; transition: transform 0.45s var(--ease); }
 .emo button.is-pick svg { transform: scale(1.1); }
 .chatbtn { position: fixed; left: 50%; bottom: calc(var(--m) + 64px); z-index: 90; translate: -50% 0; height: 40px; padding: 0 16px; color: #f4f5ef; background: rgba(12, 16, 13, 0.5); border: 1px solid rgba(244, 245, 239, 0.25); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); opacity: 0; pointer-events: none; transition: opacity 0.4s; }
 @media (pointer: coarse) { .chatbtn.is-on { opacity: 1; pointer-events: auto; } }
@@ -628,31 +628,36 @@ html.is-saying .cursor { opacity: 0; }
 .space canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
 .js .canvas { background: transparent; }
 
-/* a person behind the glass: a pointer, a name, and a pane for their words. Blurred and faint as far as the glass
-   between you is frosted (--fz under the pointer, --fp under the words), sharp where it has been wiped */
+/* a person behind the glass: a pointer and one card. Blurred and faint as far as the glass between you is frosted
+   (--fz under the pointer, --fp under the card), sharp where it has been wiped */
 .peers { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.wall .peers { z-index: 1; }
-.wall .wall__grid { z-index: 1; }
+.wall .peers, .wall .wall__grid { z-index: 1; }
 .peer { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; will-change: transform; }
-.peer__arrow, .peer__tag { filter: blur(calc(var(--fz, 1) * 7px)); opacity: calc(1 - var(--fz, 1) * 0.45); transition: filter 0.3s, opacity 0.3s; }
-.peer__arrow { position: absolute; left: -1px; top: -1px; width: 17px; height: 23px; max-width: none; fill: #f6f7f2; stroke: rgba(14, 17, 20, 0.85); stroke-width: 1.2; stroke-linejoin: round; transition: transform 0.25s var(--ease), filter 0.3s, opacity 0.3s; transform-origin: 1px 1px; }
-.peer.is-down .peer__arrow { transform: scale(0.86); }
-.peer__tag { position: absolute; left: 15px; top: 21px; padding: 4px 7px; white-space: nowrap; font: 500 10.5px/1 var(--mono); letter-spacing: 0.03em; color: #f4f5ef; background: rgba(12, 16, 13, 0.66); }
-.peer.is-talking .peer__tag { opacity: 0; }
-.peer__pane { position: absolute; left: 20px; top: -6px; opacity: 0; transform: translateY(4px); filter: blur(calc(var(--fp, 1) * 8px)); transition: opacity 0.35s, transform 0.5s var(--ease), filter 0.3s; }
-.peer.is-talking .peer__pane { opacity: calc(1 - var(--fp, 1) * 0.4); transform: none; }
-/* the pane, the same on both sides: the name on top, the words under it */
-.pane { width: max-content; max-width: 304px; padding: 9px 12px 10px; font: 500 15px/19.5px var(--f2); letter-spacing: -0.005em; color: #f4f5ef; background: rgba(12, 16, 13, 0.62); border: 1px solid rgba(244, 245, 239, 0.16); }
-.pane__who { display: block; height: 18px; font: 500 10.5px/14px var(--mono); letter-spacing: 0.03em; text-transform: uppercase; color: rgba(244, 245, 239, 0.6); white-space: nowrap; }
-.pane__t { display: block; overflow-wrap: anywhere; }
-.pane__t svg { width: 30px; height: 30px; }
-.pane__in { display: none; width: 268px; padding: 0; font: inherit; color: inherit; background: none; border: 0; outline: none; caret-color: #f4f5ef; }
-.pane__in::placeholder { color: rgba(244, 245, 239, 0.4); }
-.pane--mine { position: fixed; left: 0; top: 0; z-index: 97; pointer-events: none; opacity: 0; transition: opacity 0.3s; -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); }
-.pane--mine.is-on { opacity: 1; }
-.pane--mine.is-edit { pointer-events: auto; }
-.pane--mine.is-edit .pane__t { display: none; }
-.pane--mine.is-edit .pane__in { display: block; }
+.peer__arrow { position: absolute; left: -1px; top: -1px; width: 16px; height: 22px; max-width: none; fill: #f6f7f2; stroke: rgba(12, 15, 18, 0.9); stroke-width: 1.15; stroke-linejoin: round; transform-origin: 1.5px 1.5px; filter: blur(calc(var(--fz, 1) * 7px)); opacity: calc(1 - var(--fz, 1) * 0.45); transition: transform 0.3s var(--ease), filter 0.35s, opacity 0.35s; }
+.peer.is-down .peer__arrow { transform: scale(0.84); }
+.peer .card { position: absolute; left: 12px; top: 16px; filter: blur(calc(var(--fp, 1) * 8px)); opacity: calc(1 - var(--fp, 1) * 0.4); transition: filter 0.35s, opacity 0.35s; }
+/* the card: square, dark glass, the interface's own type. The name in mono capitals; the words under it */
+.card { box-sizing: border-box; width: max-content; max-width: 288px; overflow: hidden; color: #f4f5ef; background: rgba(12, 16, 13, 0.7); border: 1px solid rgba(244, 245, 239, 0.14); }
+.card__who { display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 8px; font: 500 10.5px/1 var(--mono); letter-spacing: 0.04em; white-space: nowrap; }
+.card__dots { display: none; gap: 3px; }
+.card__dots i { width: 3px; height: 3px; background: currentColor; opacity: 0.3; animation: dot 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.card__dots i:nth-child(2) { animation-delay: 0.15s; }
+.card__dots i:nth-child(3) { animation-delay: 0.3s; }
+.peer.is-typing .card__dots { display: inline-flex; }
+.card__msg { display: none; padding: 0 10px 10px; }
+.peer.is-talking .card__msg { display: block; }
+.peer.is-talking .card__who { color: rgba(244, 245, 239, 0.6); padding: 0 10px; height: 26px; }
+.card__t { font: 500 14.5px/19px var(--f2); letter-spacing: -0.005em; overflow-wrap: anywhere; min-height: 19px; }
+.card__t svg { display: block; width: 28px; height: 28px; fill: currentColor; }
+/* mine: the same card, without my name; clear, on my side of the glass */
+.card--mine { position: fixed; left: 0; top: 0; z-index: 97; pointer-events: none; display: none; -webkit-backdrop-filter: blur(12px) saturate(1.2); backdrop-filter: blur(12px) saturate(1.2); }
+.card--mine.is-on { display: block; }
+.card--mine .card__msg { display: block; padding: 9px 10px 10px; }
+.card__in { display: none; width: 250px; height: 19px; padding: 0; font: 500 14.5px/19px var(--f2); color: inherit; background: none; border: 0; outline: none; caret-color: #f4f5ef; }
+.card__in::placeholder { color: rgba(244, 245, 239, 0.38); }
+.card--mine.is-edit { pointer-events: auto; }
+.card--mine.is-edit .card__t { display: none; }
+.card--mine.is-edit .card__in { display: block; }
 .knock { position: fixed; left: 0; top: 0; z-index: 96; width: 0; height: 0; pointer-events: none; }
 .knock i { position: absolute; left: 0; top: -0.75px; width: 18px; height: 1.5px; background: #f6f7f2; transform-origin: 0 50%; }
 .knock s { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border: 1.5px solid #f6f7f2; border-radius: 50%; }

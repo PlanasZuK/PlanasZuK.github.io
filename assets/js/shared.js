@@ -6,7 +6,7 @@
 const LIB = "https://cdn.jsdelivr.net/npm/mqtt@5.16.0/dist/mqtt.esm.js";
 const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
 // tests never meet real visitors
-const BASE = "polplanas.com/glass/v3/" + (/[?&]testb/.test(location.search) ? "test/" : "");
+const BASE = "polplanas.com/glass/v3/" + (/[?&]test\b/.test(location.search) ? "test/" : "");
 const MAX = 4, HEARTBEAT = 3000, GONE = 10000;
 const TYPES = new Set(["h", "q", "f", "n", "e", "m", "k", "b", "c"]);
 
