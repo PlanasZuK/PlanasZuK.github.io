@@ -18,7 +18,7 @@
     },
     glass: {
       fog: [1, 0, 1, 0.01], refog: [0.042, 0, 0.2, 0.002], frostBlur: [4.7, 0, 7, 0.1], frostLift: [0.06, 0, 0.3, 0.005], frostGlow: [0.1, 0, 0.4, 0.005],
-      frostDesat: [0.3, 0, 1, 0.01], micro: [0.022, 0, 0.1, 0.002], clearBlur: [0.65, 0, 4, 0.05], refract: [0.2, 0, 0.6, 0.01], rim: [0.22, 0, 1, 0.01],
+      frostDesat: [0.3, 0, 1, 0.01], micro: [0.022, 0, 0.1, 0.002], clearBlur: [0.25, 0, 4, 0.05], refract: [0.2, 0, 0.6, 0.01], rim: [0.22, 0, 1, 0.01],
       spec: [1.5, 0, 4, 0.05], specSharp: [50, 5, 300, 1], wipe: [14, 6, 40, 1], grease: [0.2, 0, 1, 0.01],
     },
     wind: {
@@ -241,7 +241,7 @@ void main() {
   if (fa < 1.) {
     vec2 ca = (uv - .5) * k_ca;
     clear = vec3(S(uv + ca, k_clearBlur).r, S(uv, k_clearBlur).g, S(uv - ca, k_clearBlur).b);
-    clear = clear * 1.045 + .012;
+    clear = clear * 1.07 + .016;
   }
   if (fa > 0.) {
     vec2 j = (vec2(hash(px), hash(px + 7.3)) - .5) * .012;
@@ -404,7 +404,7 @@ void main() { o = texture(uSp, vT) * vA; }`;
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
       // the water layer's size (in its own pixels); it is drawn on the graphics card, never on a 2D canvas
       this.water = { width: 2, height: 2 };
-      this.fog = document.createElement("canvas"); this.fx = this.fog.getContext("2d");
+      this.fog = document.createElement("canvas"); this.fx = this.fog.getContext("2d", { willReadFrequently: true });
       this.grease = document.createElement("canvas"); this.gx = this.grease.getContext("2d");
       this.drops = [];
       this.t0 = this.last = performance.now();
@@ -860,6 +860,12 @@ void main() { o = texture(uSp, vT) * vA; }`;
     }
     // what is stuck on the inside of the glass (centre x, y and half size, in the canvas's 0..1, y up)
     rects(arr, n) { this.rectU = arr; this.rectN = n; }
+    // how frosted the glass is at a point (0..1 of the view): 0 wiped clean, 1 fully frosted
+    fogAt(x, y) {
+      if (this.dead || !this.fog.width) return 1;
+      const X = Math.max(0, Math.min(this.fog.width - 1, Math.round(x * this.fog.width))), Y = Math.max(0, Math.min(this.fog.height - 1, Math.round(y * this.fog.height)));
+      return (this.fx.getImageData(X, Y, 1, 1).data[0] / 255) * this.P.fog;
+    }
     // the people behind the glass, drawn by whoever knows them (a 2D canvas), sent up when it changed
     layer(canvas) { this.upload("pl", canvas, false); }
     // the glass moved under the view (by css pixels): its drops and its frost move with it, fresh frost comes in

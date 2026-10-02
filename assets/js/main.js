@@ -669,31 +669,32 @@
   })();
 
   /* ---------------- the other side of the glass ----------------
-     Whoever else is on the site at this moment is behind the same window. You see them through the frost: a pointer
-     and their name, a hand's shadow when it comes close, a fingertip where it touches. What they write on the glass
-     clears it for you too (mirrored, as through a real pane on the landing). They can knock (a double click), and
-     you feel the glass ring; they can send a few words (Enter) or a face (Shift), which arrive behind the glass, in
-     their own voice: you will see that something is there, but to read it you have to wipe the frost away.
-     Hold a finger still on the glass and you breathe on it, the frost comes back and you can write again. Touch the
-     same spot as them, at the same time, and the glass warms between your two fingers. */
+     Whoever else is on the site at this moment is behind the same window (on the landing, and on the work). Their
+     pointer, their name and what they say are clean interface elements placed behind the glass: wherever the glass
+     is frosted they are blurred and faint, and where it has been wiped they are sharp. So you always see that
+     someone is there and roughly what they do, but to read them you wipe the frost away.
+     Enter opens a pane by your pointer, the same pane they will see by theirs; Shift, a row of signs; two quick
+     presses knock on the glass; a finger held still breathes on it; two fingers on the same spot warm it. */
   presence = (() => {
     const T = {
-      ca: { someone: "Algú", join: (n) => `${n} és a l’altra banda del vidre.`, leave: (n) => `${n} se n’ha anat.`, knock: (n) => `${n} truca al vidre!`, wrote: (n) => `${n} t’ha escrit alguna cosa. Desentela el vidre per llegir-ho.`, alone: "Ara mateix no hi ha ningú a l’altra banda.", ph: "Escriu-li i prem Enter", toc: "toc toc", hint: "Doble clic per trucar. Shift per una cara. Enter per escriure-li." },
-      es: { someone: "Alguien", join: (n) => `${n} está al otro lado del cristal.`, leave: (n) => `${n} se ha ido.`, knock: (n) => `¡${n} llama al cristal!`, wrote: (n) => `${n} te ha escrito algo. Desempaña el cristal para leerlo.`, alone: "Ahora mismo no hay nadie al otro lado.", ph: "Escríbele y pulsa Enter", toc: "toc toc", hint: "Doble clic para llamar. Shift para una cara. Enter para escribirle." },
-      en: { someone: "Someone", join: (n) => `${n} is on the other side of the glass.`, leave: (n) => `${n} has gone.`, knock: (n) => `${n} is knocking!`, wrote: (n) => `${n} wrote you something. Wipe the glass to read it.`, alone: "Nobody is on the other side right now.", ph: "Write to them, press Enter", toc: "knock knock", hint: "Double click to knock. Shift for a face. Enter to write." },
+      ca: { someone: "Algú", join: (n) => `${n} és a l’altra banda del vidre.`, leave: (n) => `${n} se n’ha anat.`, knock: (n) => `${n} truca al vidre!`, wrote: (n) => `${n} t’ha escrit. Desentela el vidre per llegir-ho.`, alone: "Ara mateix no hi ha ningú a l’altra banda.", ph: "Escriu i prem Enter", toc: "toc toc", hint: "Enter per escriure. Shift per un signe. Dos tocs per trucar.", write: "Escriu" },
+      es: { someone: "Alguien", join: (n) => `${n} está al otro lado del cristal.`, leave: (n) => `${n} se ha ido.`, knock: (n) => `¡${n} llama al cristal!`, wrote: (n) => `${n} te ha escrito. Desempaña el cristal para leerlo.`, alone: "Ahora mismo no hay nadie al otro lado.", ph: "Escribe y pulsa Enter", toc: "toc toc", hint: "Enter para escribir. Shift para un signo. Dos toques para llamar.", write: "Escribir" },
+      en: { someone: "Someone", join: (n) => `${n} is on the other side of the glass.`, leave: (n) => `${n} has gone.`, knock: (n) => `${n} is knocking!`, wrote: (n) => `${n} wrote to you. Wipe the glass to read it.`, alone: "Nobody is on the other side right now.", ph: "Type and press Enter", toc: "knock knock", hint: "Enter to write. Shift for a sign. Two taps to knock.", write: "Write" },
     }[LANG] || {};
     // six small signs, solid, cut clean like the rest of the interface (Phosphor Icons, fill, MIT licence)
     const ICON = {"wave":"M219.31,98.46A88,88,0,1,1,67.08,186.77h0L26.15,115.88a16,16,0,0,1,27.69-16L72.4,132a8,8,0,0,0,13.86-8L47,56A16,16,0,0,1,74.69,40L114,108a8,8,0,1,0,13.85-8l-30-52a16,16,0,0,1,27.71-16L166,102.12A48.25,48.25,0,0,0,152,136a47.59,47.59,0,0,0,9.6,28.8,8,8,0,1,0,12.79-9.61A32,32,0,0,1,181,110.26a8,8,0,0,0,2.17-10.43L171.71,80a16,16,0,0,1,27.71-16l19.89,34.46Zm-29.37-57A43.74,43.74,0,0,1,216.74,62l.33.57a8,8,0,0,0,13.86-8L230.6,54a59.64,59.64,0,0,0-36.54-28,8,8,0,0,0-4.12,15.46ZM79.58,225.72A103.58,103.58,0,0,1,53.93,196a8,8,0,0,0-13.86,8,119.56,119.56,0,0,0,29.6,34.28,8,8,0,0,0,9.91-12.56Z","heart":"M240,102c0,70-103.79,126.66-108.21,129a8,8,0,0,1-7.58,0C119.79,228.66,16,172,16,102A62.07,62.07,0,0,1,78,40c20.65,0,38.73,8.88,50,23.89C139.27,48.88,157.35,40,178,40A62.07,62.07,0,0,1,240,102Z","smile":"M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24ZM92,96a12,12,0,1,1-12,12A12,12,0,0,1,92,96Zm82.92,60c-10.29,17.79-27.39,28-46.92,28s-36.63-10.2-46.92-28a8,8,0,1,1,13.84-8c7.47,12.91,19.21,20,33.08,20s25.61-7.1,33.08-20a8,8,0,1,1,13.84,8ZM164,120a12,12,0,1,1,12-12A12,12,0,0,1,164,120Z","thumbs":"M234,80.12A24,24,0,0,0,216,72H160V56a40,40,0,0,0-40-40,8,8,0,0,0-7.16,4.42L75.06,96H32a16,16,0,0,0-16,16v88a16,16,0,0,0,16,16H204a24,24,0,0,0,23.82-21l12-96A24,24,0,0,0,234,80.12ZM32,112H72v88H32Z","fire":"M143.38,17.85a8,8,0,0,0-12.63,3.41l-22,60.41L84.59,58.26a8,8,0,0,0-11.93.89C51,87.53,40,116.08,40,144a88,88,0,0,0,176,0C216,84.55,165.21,36,143.38,17.85Zm40.51,135.49a57.6,57.6,0,0,1-46.56,46.55A7.65,7.65,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z","spark":"M208,144a15.78,15.78,0,0,1-10.42,14.94L146,178l-19,51.62a15.92,15.92,0,0,1-29.88,0L78,178l-51.62-19a15.92,15.92,0,0,1,0-29.88L78,110l19-51.62a15.92,15.92,0,0,1,29.88,0L146,110l51.62,19A15.78,15.78,0,0,1,208,144ZM152,48h16V64a8,8,0,0,0,16,0V48h16a8,8,0,0,0,0-16H184V16a8,8,0,0,0-16,0V32H152a8,8,0,0,0,0,16Zm88,32h-8V72a8,8,0,0,0-16,0v8h-8a8,8,0,0,0,0,16h8v8a8,8,0,0,0,16,0V96h8a8,8,0,0,0,0-16Z"};
     const EMO = Object.keys(ICON);
     const svg = (k) => `<svg viewBox="0 0 256 256" aria-hidden="true"><path d="${ICON[k]}"/></svg>`;
-    const P2D = Object.fromEntries(EMO.map((k) => [k, new Path2D(ICON[k])]));
+    const ARROW = `<svg class="peer__arrow" viewBox="0 0 16 22" aria-hidden="true"><path d="M1 1v17.2l4.4-4.2 3 6.9 3-1.3-2.9-6.7H15z"/></svg>`;
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const others = new Map();
     let share = null, me = { x: innerWidth / 2, y: innerHeight / 2, has: false }, myName = "", toldWrote = false, toldHint = false;
     try { myName = (localStorage.getItem("pp-name") || "").slice(0, 18); } catch (e) {}
     const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296; };
     // a voice of one's own: higher or lower, rounder or thinner, steadier or shakier
     const voiceOf = (id, x = 0) => { const a = hash(id + "a"), b = hash(id + "b"), c = hash(id + "c"); return { key: id, pitch: -6 + a * 11, form: 0.86 + b * 0.3, wob: 0.6 + c * 1.1, range: 0.8 + a * 0.45, fm: 0.7 + c * 0.7, x }; };
-    // a word from the glass: the voice's bubble on the landing, a quiet line elsewhere
+    const durOf = (n) => Math.min(2.8, 0.034 * n + 0.25), holdOf = (n) => (5 + Math.min(14, n / 8)) * 1000;
+    // a word from the glass, always in the same calm place at the top
     const notice = d.createElement("p"); notice.className = "notice"; notice.setAttribute("aria-live", "polite"); d.body.appendChild(notice);
     const tell = (text, hold = 5) => {
       notice.textContent = text; notice.classList.add("is-on");
@@ -703,13 +704,14 @@
     // only the windows are shared: the landing and the work
     const place = () => (busy ? null : mode === "page" && current === "work" && !caseOpen ? "work" : mode === "focus" && Z.center === "home" ? "home" : null);
     const glassOf = (p) => (p === "home" ? hero.rain : p === "work" && wall ? wall.rain : null);
+    const hostOf = (p) => (p === "home" ? hero.el : p === "work" && wall ? wall.sec : null);
     const enc = (cx, cy) => {
       const p = place(), o = { p };
       if (p === "work" && wall) { const w = wall.toWorld(cx, cy); o.x = +w[0].toFixed(4); o.y = +w[1].toFixed(4); }
       else { o.x = +(cx / innerWidth).toFixed(4); o.y = +(cy / innerHeight).toFixed(4); }
       return o;
     };
-    // their point, on my screen; the landing is seen from the other side, so it is mirrored
+    // their point on my screen; the landing is seen from the other side of the pane, so it is mirrored
     const dec = (m) => {
       const p = place();
       if (!m || !m.p || m.p !== p) return null;
@@ -718,92 +720,35 @@
       return null;
     };
     const nameOf = (o) => o.name || (others.size > 1 ? `${T.someone} ${o.slot + 1}` : T.someone);
+    const BUB = { x: 20, y: -6 };
+
+    // ---- what a person is, on screen: pointer, name tag, and the pane for their words (the same pane as mine) ----
+    const layerIn = (host) => { if (!host) return null; let l = host.querySelector(":scope > .peers"); if (!l) { l = d.createElement("div"); l.className = "peers"; l.setAttribute("aria-hidden", "true"); const c = host.querySelector(".hero__rain, .wall__glass"); c ? c.after(l) : host.prepend(l); } return l; };
     const get = (id) => {
       if (others.has(id)) return others.get(id);
       const used = new Set([...others.values()].map((o) => o.slot)), slot = [0, 1, 2, 3, 4, 5].find((i) => !used.has(i));
-      const o = { id, slot, name: "", m: null, x: -999, y: -999, tx: -999, ty: -999, seen: 0, last: performance.now(), voice: voiceOf(id), say: null, fx: [] };
+      const el = d.createElement("div"); el.className = "peer";
+      el.innerHTML = `${ARROW}<span class="peer__tag"></span><div class="pane peer__pane"><span class="pane__who"></span><span class="pane__t"></span></div>`;
+      const o = { id, slot, el, name: "", m: null, x: -999, y: -999, tx: -999, ty: -999, seen: 0, last: performance.now(), voice: voiceOf(id), say: null, fz: 1, fp: 1, sampled: 0 };
       others.set(id, o);
       return o;
     };
-
-    // the pane beside a pointer: where it starts (from the tip of the pointer) and how wide its words may run
-    const BUB = { x: 20, y: -6, max: 280 };
-    // ---- the layer behind the glass: drawn here, in 2D, and handed to the glass, which frosts it like the world ----
-    const pc = d.createElement("canvas"), px = pc.getContext("2d");
-    let PS = 1, dirty = false, wasDrawn = false;
-    const sizeLayer = () => { PS = Math.min(1, 1100 / innerWidth); pc.width = Math.round(innerWidth * PS); pc.height = Math.round(innerHeight * PS); };
-    sizeLayer(); addEventListener("resize", sizeLayer);
-    const font = (w, s, f) => `${w} ${s * PS}px ${f}`;
-    const wrap = (text, max) => {
-      const words = text.split(" "), lines = []; let line = "";
-      for (const w of words) { const t = line ? line + " " + w : w; if (px.measureText(t).width > max && line) { lines.push(line); line = w; } else line = t; }
-      if (line) lines.push(line);
-      return lines.slice(0, 5);
+    const paint = (o) => {
+      const nm = nameOf(o).toUpperCase(), tag = o.el.querySelector(".peer__tag"), who = o.el.querySelector(".pane__who");
+      if (tag.textContent !== nm) tag.textContent = nm;
+      if (who.textContent !== nm) who.textContent = nm;
     };
-    function draw(now) {
-      const p = place(), g = glassOf(p);
-      const any = g && [...others.values()].some((o) => o.seen > 0.01);
-      if (!any) { if (wasDrawn) { px.clearRect(0, 0, pc.width, pc.height); for (const r of [hero.rain, wall && wall.rain]) if (r) r.layer(pc); wasDrawn = false; } return; }
-      px.clearRect(0, 0, pc.width, pc.height);
-      for (const o of others.values()) {
-        if (o.seen < 0.01) continue;
-        const x = o.x * PS, y = o.y * PS, a = o.seen;
-        px.save(); px.globalAlpha = a;
-        // the shape of the person, a soft darkness the frost turns into a shadow that moves
-        const gr = px.createRadialGradient(x, y + 30 * PS, 0, x, y + 30 * PS, 120 * PS);
-        gr.addColorStop(0, "rgba(10,12,14,0.55)"); gr.addColorStop(0.55, "rgba(10,12,14,0.25)"); gr.addColorStop(1, "rgba(10,12,14,0)");
-        px.fillStyle = gr; px.fillRect(x - 120 * PS, y - 90 * PS, 240 * PS, 240 * PS);
-        // the pointer, the same shape as anyone's, seen through the pane
-        px.translate(x, y);
-        const k = 1.25 * PS * (o.m && o.m.d ? 0.86 : 1);
-        px.beginPath(); px.moveTo(0, 0); px.lineTo(0, 17 * k); px.lineTo(4.2 * k, 13 * k); px.lineTo(7.4 * k, 20 * k); px.lineTo(10.2 * k, 18.8 * k); px.lineTo(7.1 * k, 12 * k); px.lineTo(12.4 * k, 12 * k); px.closePath();
-        px.fillStyle = "rgba(250,250,247,0.96)"; px.strokeStyle = "rgba(18,20,22,0.85)"; px.lineWidth = 1.3 * PS; px.lineJoin = "round"; px.fill(); px.stroke();
-        const nm = nameOf(o).toUpperCase(), talking = o.say && now - o.say.at < o.say.hold;
-        if (!talking) {
-          px.font = font(500, 11.5, "'Chivo Mono', monospace");
-          const tw = px.measureText(nm).width + 14 * PS;
-          px.fillStyle = "rgba(12,16,13,0.66)"; px.fillRect(14 * PS, 20 * PS, tw, 20 * PS);
-          px.fillStyle = "rgba(244,245,239,0.95)"; px.textBaseline = "middle"; px.fillText(nm, 21 * PS, 30.5 * PS);
-        } else {
-          // the pane (the same as the one on the sender's side: same place, same size, same type)
-          const s = o.say, fade = Math.min(1, (s.hold - (now - s.at)) / 800), bx = BUB.x * PS, by = BUB.y * PS, padX = 12 * PS, padT = 9 * PS, padB = 10 * PS;
-          px.font = font(500, 15, "'Inter Tight', sans-serif");
-          const lines = s.icon ? [] : wrap(s.text, BUB.max * PS), lh = 19.5 * PS, whoH = 18 * PS;
-          px.font = font(500, 10.5, "'Chivo Mono', monospace"); const ww = px.measureText(nm).width;
-          px.font = font(500, 15, "'Inter Tight', sans-serif");
-          const tw = s.icon ? 30 * PS : Math.max(...lines.map((l) => px.measureText(l).width)), bw = Math.max(ww, tw) + padX * 2, bh = padT + whoH + (s.icon ? 30 * PS : lines.length * lh) + padB;
-          px.globalAlpha = a * fade;
-          px.fillStyle = "rgba(12,16,13,0.66)"; px.fillRect(bx, by, bw, bh);
-          px.strokeStyle = "rgba(244,245,239,0.16)"; px.lineWidth = 1 * PS; px.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
-          px.textBaseline = "top";
-          px.font = font(500, 10.5, "'Chivo Mono', monospace"); px.fillStyle = "rgba(244,245,239,0.6)"; px.fillText(nm, bx + padX, by + padT + 1 * PS);
-          if (s.icon) {
-            const k = Math.min(1, (now - s.at) / 300), e = 1 - Math.pow(1 - k, 4), sz = 30 * PS * (0.7 + 0.3 * e);
-            px.save(); px.translate(bx + padX + 15 * PS, by + padT + whoH + 15 * PS); px.scale(sz / 256, sz / 256); px.translate(-128, -128);
-            px.fillStyle = "rgba(244,245,239,0.98)"; px.fill(P2D[s.icon]); px.restore();
-          } else {
-            const shown = Math.ceil(Math.min(1, (now - s.at) / (s.dur * 1000)) * s.text.length);
-            px.font = font(500, 15, "'Inter Tight', sans-serif"); px.fillStyle = "rgba(244,245,239,0.98)";
-            let left = shown;
-            lines.forEach((l, i) => { const part = l.slice(0, Math.max(0, left)); left -= l.length + 1; px.fillText(part, bx + padX, by + padT + whoH + i * lh); });
-          }
-        }
-        px.restore();
-        // faces and knocks, where they were sent
-        o.fx = o.fx.filter((f) => now - f.at < f.life);
-        for (const f of o.fx) {
-          const e = (now - f.at) / f.life, ex = f.x * PS, ey = (f.y - e * f.rise) * PS;
-          px.save(); px.globalAlpha = Math.min(1, e * 6) * (1 - Math.pow(e, 3)); px.textAlign = "center"; px.textBaseline = "middle";
-          if (f.kind === "emoji") { px.font = font(400, 46 * (0.6 + Math.min(1, e * 5) * 0.4), "system-ui, 'Apple Color Emoji', 'Segoe UI Emoji'"); px.fillText(f.e, ex, ey); }
-          else { px.font = font(800, 30, "'Archivo', sans-serif"); px.fillStyle = "rgba(250,250,247,0.95)"; px.fillText(T.toc.toUpperCase(), ex + Math.sin(e * 40) * 3 * (1 - e) * PS, ey); }
-          px.restore();
-        }
-      }
-      g.layer(pc); wasDrawn = true;
+    // their words arrive behind the glass, typed in at the pace of their voice
+    function hear(o, text, icon) {
+      const t = o.el.querySelector(".pane__t"), n = icon ? 0 : text.length;
+      if (o.say && o.say.tw) o.say.tw.kill();
+      o.say = { at: performance.now(), hold: icon ? 9000 : holdOf(n) + durOf(n) * 1000 };
+      o.el.classList.add("is-talking");
+      if (icon) { t.innerHTML = svg(icon); if (!reduce) gsap.fromTo(t.firstChild, { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "expo.out" }); return; }
+      t.textContent = "";
+      const oo = { n: 0 };
+      o.say.tw = gsap.to(oo, { n, duration: reduce ? 0 : durOf(n), ease: "none", onUpdate: () => (t.textContent = text.slice(0, Math.round(oo.n))) });
     }
-
-    // ---- what happens on my side when they do something ----
-    // a knock you can see: the glass shivers, a spray of frost flies off where it was hit, and (when it is theirs) the word
     function knockFx(x, y, word) {
       if (reduce) return;
       const box = d.createElement("div"); box.className = "knock"; box.style.transform = `translate3d(${x}px, ${y}px, 0)`;
@@ -811,9 +756,8 @@
       d.body.appendChild(box);
       const tl = gsap.timeline({ onComplete: () => box.remove() });
       box.querySelectorAll("i").forEach((i, n) => {
-        const a = (n / 9) * 360 + (Math.random() - 0.5) * 16, r0 = 16 + Math.random() * 6, r1 = 46 + Math.random() * 26, len = 10 + Math.random() * 12;
-        tl.fromTo(i, { rotation: a, x: Math.cos((a * Math.PI) / 180) * r0, y: Math.sin((a * Math.PI) / 180) * r0, scaleX: len / 18, opacity: 1 },
-          { x: Math.cos((a * Math.PI) / 180) * r1, y: Math.sin((a * Math.PI) / 180) * r1, scaleX: 0.15, opacity: 0, duration: 0.55, ease: "expo.out" }, 0);
+        const a = (n / 9) * 360 + (Math.random() - 0.5) * 16, r0 = 16 + Math.random() * 6, r1 = 46 + Math.random() * 26, len = 10 + Math.random() * 12, ra = (a * Math.PI) / 180;
+        tl.fromTo(i, { rotation: a, x: Math.cos(ra) * r0, y: Math.sin(ra) * r0, scaleX: len / 18, opacity: 1 }, { x: Math.cos(ra) * r1, y: Math.sin(ra) * r1, scaleX: 0.15, opacity: 0, duration: 0.55, ease: "expo.out" }, 0);
       });
       tl.fromTo(box.querySelector("s"), { scale: 0.4, opacity: 1 }, { scale: 4.2, opacity: 0, duration: 0.7, ease: "expo.out" }, 0);
       const b = box.querySelector("b");
@@ -821,7 +765,7 @@
     }
     // glass shivers: a few stiff, quick, small movements that die at once (never a wobble)
     const shiver = (el, k = 1) => {
-      if (reduce) return;
+      if (reduce || !el) return;
       const a = 2.2 * k;
       gsap.killTweensOf(el, "x,y");
       gsap.timeline().to(el, { x: -a, y: a * 0.35, duration: 0.03, ease: "none" }).to(el, { x: a * 0.8, y: -a * 0.25, duration: 0.03, ease: "none" })
@@ -831,7 +775,7 @@
       const g = glassOf(p); if (!g) return;
       knockFx(sx * innerWidth, sy * innerHeight, word);
       g.knock(sx, sy, k);
-      shiver(g.c.closest(".hero, .wall") || g.c, k);
+      shiver(hostOf(p), k);
       if (window.Sound) Sound.knock(sx * 2 - 1, k);
     }
     const connect = () => import("/assets/js/shared.js?v=" + ((($('script[src*="main.js"]') || {}).src || "").split("v=")[1] || "")).then((m) => m.share({
@@ -843,7 +787,7 @@
         gsap.delayedCall(1.4, () => { const o = others.get(id); if (o && !o.told) { o.told = true; tell(T.join(nameOf(o)), 5); if (!toldHint) { toldHint = true; gsap.delayedCall(6, () => others.size && tell(T.hint, 6)); } } });
       },
       leave(id) { const o = others.get(id); if (!o) return; o.gone = true; tell(T.leave(nameOf(o)), 4); },
-      name(id, n) { get(id).name = n.replace(/[<>]/g, "").trim(); },
+      name(id, n) { const o = get(id); o.name = String(n).replace(/[<>]/g, "").trim().slice(0, 18); paint(o); },
       // the hour of the window: the one who has been here longest keeps it; the others glide to it
       clock(id, c) {
         if (!c || typeof c.h !== "number" || typeof c.born !== "number" || c.born >= CLOCK.born) return;
@@ -858,15 +802,15 @@
         const g = glassOf(place());
         if (g && m.d) { const a = dec(m), b = prev && prev.d && prev.p === m.p ? dec(prev) : a; if (a && b) g.wipe(b.x / innerWidth, b.y / innerHeight, a.x / innerWidth, a.y / innerHeight); }
       },
-      breath(id, m) { const a = dec(m), g = glassOf(place()); if (a && g) { g.breathe(a.x / innerWidth, a.y / innerHeight, 0.06); } },
+      breath(id, m) { const a = dec(m), g = glassOf(place()); if (a && g) g.breathe(a.x / innerWidth, a.y / innerHeight, 0.06); },
       emoji(id, m) { this.chat(id, { ...m, r: m.e }); },
       chat(id, m) {
-        const o = get(id), icon = ICON[m.r] ? m.r : null, t = icon ? "" : String(m.t || "").slice(0, 140), dur = Math.min(2.8, 0.034 * t.length + 0.25), a = dec(m);
+        const o = get(id), icon = ICON[m.r] ? m.r : null, t = icon ? "" : String(m.t || "").replace(/\s+/g, " ").trim().slice(0, 140), a = dec(m);
         if (!t && !icon) return;
-        o.say = { text: t, icon, at: performance.now(), dur, hold: icon ? 9000 : Math.max(14000, t.length * 220) };
-        if (icon) { if (window.Sound && Sound.on && Sound.typeKeys) Sound.typeKeys(2, 0.1); return; }
-        if (window.Sound && Sound.on) Sound.voice(t, dur, { ...o.voice, x: a ? (a.x / innerWidth) * 2 - 1 : 0 });
-        if (!toldWrote && a) { toldWrote = true; gsap.delayedCall(dur + 0.6, () => tell(T.wrote(nameOf(o)), 6)); }
+        if (m.p) { o.m = { ...(o.m || {}), p: m.p, x: m.x, y: m.y }; o.last = performance.now(); }
+        hear(o, t, icon);
+        if (window.Sound && Sound.on) { if (icon) { if (Sound.typeKeys) Sound.typeKeys(2, 0.1); } else Sound.voice(t, durOf(t.length), { ...o.voice, x: a ? (a.x / innerWidth) * 2 - 1 : 0 }); }
+        if (!toldWrote && a) { toldWrote = true; gsap.delayedCall(durOf(t.length) + 0.6, () => { if (o.fp > 0.45) tell(T.wrote(nameOf(o)), 6); }); }
       },
       knock(id, m) {
         const o = get(id), a = dec(m); if (!a) return;
@@ -878,78 +822,114 @@
 
     // ---- telling them what I do ----
     const pressing = () => { const g = glassOf(place()); return g && g.finger ? 1 : 0; };
-    const sendNow = () => { if (!share || !share.count || !me.has) return; share.pointer({ ...enc(me.x, me.y), d: pressing() }); };
-    let still = { x: 0, y: 0, t: 0, sent: 0 };
+    const sendNow = () => { if (!share || !share.count || !me.has || !place()) return; share.pointer({ ...enc(me.x, me.y), d: pressing() }); };
+    let still = { x: 0, y: 0, t: 0, sent: 0 }, breathing = 0;
     addEventListener("pointermove", (e) => { me.x = e.clientX; me.y = e.clientY; me.has = true; if (Math.hypot(e.clientX - still.x, e.clientY - still.y) > 4) { still.x = e.clientX; still.y = e.clientY; still.t = performance.now(); } sendNow(); }, { passive: true });
     addEventListener("pointerdown", (e) => { me.x = still.x = e.clientX; me.y = still.y = e.clientY; still.t = performance.now(); me.has = true; requestAnimationFrame(sendNow); }, { passive: true });
     addEventListener("pointerup", () => requestAnimationFrame(sendNow), { passive: true });
     setInterval(sendNow, 2000);
     setInterval(() => { if (share && share.count) share.clock({ h: CLOCK.h, born: CLOCK.born }); }, 8000);
-    let breathing = 0;
     gsap.ticker.add(() => {
-      const now = performance.now(), p = place(), g = glassOf(p);
+      const now = performance.now(), p = place(), g = glassOf(p), layer = layerIn(hostOf(p));
       // a finger held still on the glass breathes on it
       if (g && g.finger && now - still.t > 650) {
         g.breathe(me.x / innerWidth, me.y / innerHeight, 0.05);
-        if (!breathing && window.Sound) Sound.breath((me.x / innerWidth) * 2 - 1);
-        breathing = breathing ? breathing : now;
-        if (now - breathing > 1000 && window.Sound) { Sound.breath((me.x / innerWidth) * 2 - 1, 0.8); breathing = now; }
+        if ((!breathing || now - breathing > 1000) && window.Sound) { Sound.breath((me.x / innerWidth) * 2 - 1, breathing ? 0.8 : 1); breathing = now; }
         if (share && share.count && now - still.sent > 140) { still.sent = now; share.breath(enc(me.x, me.y)); }
       } else breathing = 0;
       if (!others.size) return;
       for (const [id, o] of others) {
         const pos = o.gone || now - o.last > 30000 ? null : dec(o.m);
-        o.seen += ((pos ? 1 : 0) - o.seen) * 0.1;
+        if (layer && o.el.parentNode !== layer) layer.appendChild(o.el);
+        o.seen += ((pos ? 1 : 0) - o.seen) * 0.12;
         if (pos) { if (o.tx < -900) { o.x = pos.x; o.y = pos.y; } o.tx = pos.x; o.ty = pos.y; }
-        o.x += (o.tx - o.x) * 0.28; o.y += (o.ty - o.y) * 0.28;
-        if (g && o.slot < 4) g.peer(o.slot, o.x / innerWidth, o.y / innerHeight, o.m && o.m.d ? 1 : 0, pos ? o.seen : 0);
+        o.x += (o.tx - o.x) * 0.3; o.y += (o.ty - o.y) * 0.3;
+        o.el.style.transform = `translate3d(${o.x.toFixed(1)}px, ${o.y.toFixed(1)}px, 0)`;
+        o.el.style.opacity = (layer ? o.seen : 0).toFixed(3);
+        o.el.classList.toggle("is-down", !!(o.m && o.m.d));
+        if (o.say && now - o.say.at > o.say.hold) { o.el.classList.remove("is-talking"); o.say = null; }
+        // how much frost is between us, under their pointer and under their words: that is how blurred they look
+        if (g && pos && now - o.sampled > 90) {
+          o.sampled = now;
+          const pane = o.el.querySelector(".peer__pane"), pw = pane.offsetWidth || 200, ph = pane.offsetHeight || 50;
+          const fz = g.fogAt(o.x / innerWidth, o.y / innerHeight), fp = o.say ? Math.max(g.fogAt((o.x + BUB.x + pw * 0.3) / innerWidth, (o.y + BUB.y + ph / 2) / innerHeight), g.fogAt((o.x + BUB.x + pw * 0.75) / innerWidth, (o.y + BUB.y + ph / 2) / innerHeight)) : 1;
+          const q = (v) => Math.round(v * 20) / 20;
+          if (q(fz) !== o.fz) { o.fz = q(fz); o.el.style.setProperty("--fz", o.fz); }
+          if (q(fp) !== o.fp) { o.fp = q(fp); o.el.style.setProperty("--fp", o.fp); }
+        }
         // the same spot, at the same time, from both sides
         if (pos && g && g.finger && o.m && o.m.d && Math.hypot(o.x - me.x, o.y - me.y) < 46 && now - (o.touched || 0) > 6000) {
           o.touched = now; g.warm(me.x / innerWidth, me.y / innerHeight); if (window.Sound) Sound.chime((me.x / innerWidth) * 2 - 1);
         }
-        if (o.gone && o.seen < 0.01) { if (g && o.slot < 4) g.peer(o.slot, 0, 0, 0, 0); others.delete(id); }
+        if (o.gone && o.seen < 0.01) { o.el.remove(); others.delete(id); }
       }
-      for (const r of [hero.rain, wall && wall.rain]) if (r && r !== g) for (let i = 0; i < 4; i++) r.peer(i, 0, 0, 0, 0);
-      draw(now);
     });
 
-    // ---- knocking: a double click on the glass, or two quick taps ----
-    let lastKnock = 0;
+    // ---- knocking: two quick presses in the same place, with a mouse or a finger ----
+    let lastKnock = 0, tap = { t: 0, x: 0, y: 0 };
     const knockAt = (cx, cy) => { const p = place(); if (!glassOf(p) || performance.now() - lastKnock < 400) return; lastKnock = performance.now(); knockHere(p, cx / innerWidth, cy / innerHeight); if (share) share.knock(enc(cx, cy)); };
-    // two quick presses in the same place, with a mouse or a finger
-    let tap = { t: 0, x: 0, y: 0 };
     d.addEventListener("pointerdown", (e) => {
-      if (e.button || !e.target.closest(".hero, .wall") || e.target.closest(".pin, .wall__case, a, button")) return;
+      if (e.button || !e.target.closest(".hero, .wall") || e.target.closest(".pin, .wall__case, a, button, input")) return;
       const now = performance.now();
       if (now - tap.t < 340 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 26) { knockAt(e.clientX, e.clientY); tap.t = 0; }
       else tap = { t: now, x: e.clientX, y: e.clientY };
     }, true);
 
-    // ---- Shift: a few faces around the pointer; move towards one and let go ----
+    // ---- my pane: the same component the others see, by my pointer, on my side of the glass (always clear) ----
     const typing = (e) => e.target.closest && e.target.closest("input, textarea, select, [contenteditable]");
+    const mine = d.createElement("div"); mine.className = "pane pane--mine"; mine.innerHTML = `<span class="pane__who"></span><span class="pane__t"></span><input class="pane__in" maxlength="140" autocomplete="off" enterkeyhint="send" spellcheck="false" aria-label="${esc(T.ph)}" placeholder="${esc(T.ph)}">`;
+    d.body.appendChild(mine);
+    const mWho = mine.querySelector(".pane__who"), mT = mine.querySelector(".pane__t"), input = mine.querySelector(".pane__in");
+    let chatOn = false, mineHide = null;
+    const mx = gsap.quickTo(mine, "x", { duration: 0.32, ease: "power3" }), my = gsap.quickTo(mine, "y", { duration: 0.32, ease: "power3" });
+    const at = () => [Math.min((me.has ? me.x : innerWidth / 2) + BUB.x, innerWidth - 324), (me.has ? me.y : innerHeight * 0.6) + BUB.y];
+    gsap.set(mine, { x: at()[0], y: at()[1] });
+    addEventListener("pointermove", () => { const [x, y] = at(); if (mine.classList.contains("is-on")) { mx(x); my(y); } else gsap.set(mine, { x, y }); }, { passive: true });
+    const showMine = (body, isIcon) => {
+      mWho.textContent = (myName || T.someone).toUpperCase();
+      if (mineHide) mineHide.kill();
+      mine.classList.add("is-on"); html.classList.add("is-saying");
+      mine.classList.toggle("is-edit", body === null);
+      if (body !== null) { mT.innerHTML = body; mine.classList.toggle("is-icon", !!isIcon); }
+      if (isIcon && !reduce) gsap.fromTo(mT.firstChild, { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "expo.out" });
+    };
+    const hideMine = (after) => { if (mineHide) mineHide.kill(); mineHide = gsap.delayedCall(after, () => { mine.classList.remove("is-on", "is-edit"); html.classList.remove("is-saying"); }); };
+    const openChat = () => {
+      if (!place()) return;
+      if (!share || !share.count) { tell(T.alone, 3); return; }
+      chatOn = true; showMine(null); input.value = ""; input.focus({ preventScroll: true });
+    };
+    const closeChat = () => { chatOn = false; input.blur(); if (!mT.textContent && !mT.querySelector("svg")) hideMine(0); else mine.classList.remove("is-edit"); };
+    addEventListener("keydown", (e) => {
+      if (chatOn || typing(e) || e.metaKey || e.ctrlKey || e.altKey || d.getElementById("loader")) return;
+      if (e.key === "Enter" || e.key === "/") { e.preventDefault(); openChat(); }
+    });
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") { e.preventDefault(); mT.textContent = ""; closeChat(); }
+      if (e.key === "Enter" && !e.isComposing) {
+        e.preventDefault();
+        const t = input.value.replace(/\s+/g, " ").trim().slice(0, 140);
+        chatOn = false; input.blur();
+        if (!t) { mT.textContent = ""; hideMine(0); return; }
+        const [x, y] = [me.has ? me.x : innerWidth / 2, me.has ? me.y : innerHeight / 2];
+        if (share) share.chat({ ...enc(x, y), t });
+        mT.textContent = t; mine.classList.remove("is-edit", "is-icon");
+        if (window.Sound && Sound.on) Sound.voice(t, durOf(t.length), voiceOf(share ? share.id : "me", (x / innerWidth) * 2 - 1));
+        hideMine(holdOf(t.length) / 1000 + 0.5);
+      }
+    });
+    input.addEventListener("blur", () => setTimeout(() => { if (chatOn && d.activeElement !== input) { chatOn = false; mT.textContent = ""; hideMine(0); } }, 150));
+
+    // ---- Shift: a short row of signs over the pointer; slide to one and let go ----
     const ring = d.createElement("div"); ring.className = "emo"; ring.setAttribute("aria-hidden", "true");
     ring.innerHTML = `<div class="emo__row">${EMO.map((k) => `<button type="button" tabindex="-1" data-e="${k}">${svg(k)}</button>`).join("")}</div>`;
     d.body.appendChild(ring);
     const tiles = [...ring.querySelectorAll("button")];
-    let ringOn = false, pick = null, rx = 0, ry = 0, chatOn = false;
-    // my own words and signs: a bubble that follows my pointer, on my side of the glass, clear
-    const mine = d.createElement("p"); mine.className = "voice mine"; d.body.appendChild(mine);
-    const showMine = (html, text) => {
-      const who = (myName || T.someone).toUpperCase().replace(/[<>&]/g, "");
-      mine.innerHTML = `<span class="mine__who">${who}</span><span class="mine__t">${html}</span>`; mine.classList.add("is-on"); mine.classList.toggle("is-icon", !text); html.classList.add("is-saying");
-      const body = mine.querySelector(".mine__t");
-      const n = text ? text.length : 0, dur = Math.min(2.8, 0.034 * n + 0.25);
-      // only the typing and the hiding are replaced, never the movement that keeps the bubble at the pointer
-      if (mine._type) mine._type.kill(); if (mine._hide) mine._hide.kill();
-      if (text) { const oo = { n: 0 }; mine._type = gsap.to(oo, { n, duration: dur, ease: "none", onUpdate: () => (body.textContent = text.slice(0, Math.round(oo.n))) }); }
-      else gsap.fromTo(body.firstChild, { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "expo.out" });
-      // long enough to be read: a few seconds, more for a longer line
-      mine._hide = gsap.delayedCall(text ? dur + Math.min(14, 5 + n / 9) : 5, () => { mine.classList.remove("is-on"); html.classList.remove("is-saying"); });
-      return dur;
-    };
+    let ringOn = false, pick = null, rx = 0, ry = 0;
     const sendFace = (k) => {
       const x = me.has ? me.x : innerWidth / 2, y = me.has ? me.y : innerHeight / 2;
-      showMine(svg(k), "");
+      showMine(svg(k), true); hideMine(5);
       if (window.Sound && Sound.on && Sound.typeKeys) Sound.typeKeys(2, 0.1);
       if (share) share.chat({ ...enc(x, y), r: k });
     };
@@ -961,13 +941,7 @@
       ring.classList.add("is-on");
       if (!reduce) gsap.fromTo(tiles, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "expo.out", stagger: 0.025, overwrite: true });
     });
-    addEventListener("keyup", (e) => {
-      if (e.key !== "Shift" || !ringOn) return;
-      ringOn = false; ring.classList.remove("is-on");
-      if (pick) sendFace(pick.dataset.e);
-      setPick(null);
-    });
-    // sliding sideways picks a sign; let go of Shift to send it (or click it)
+    addEventListener("keyup", (e) => { if (e.key !== "Shift" || !ringOn) return; ringOn = false; ring.classList.remove("is-on"); if (pick) sendFace(pick.dataset.e); setPick(null); });
     addEventListener("pointermove", (e) => {
       if (!ringOn) return;
       const r = ring.firstChild.getBoundingClientRect();
@@ -976,43 +950,8 @@
       setPick(Math.abs(e.clientX - rx) > 8 || e.clientY < ry - 8 ? tiles[i] : null);
     }, { passive: true });
     ring.addEventListener("pointerdown", (e) => { const b = e.target.closest("button"); if (b) { e.preventDefault(); sendFace(b.dataset.e); ringOn = false; ring.classList.remove("is-on"); setPick(null); } });
-
-    // ---- Enter: a few words, said in my own voice; they arrive behind the frost on the other side ----
-    const box = d.createElement("form"); box.className = "chat";
-    box.innerHTML = `<div class="chat__emo">${EMO.map((k) => `<button type="button" data-e="${k}" aria-label="${k}">${svg(k)}</button>`).join("")}</div><input class="chat__in" maxlength="140" autocomplete="off" enterkeyhint="send" placeholder="${T.ph}" aria-label="${T.ph}">`;
-    d.body.appendChild(box);
-    const input = box.querySelector("input");
-    const openChat = () => {
-      if (!place()) return;
-      if (!share || !share.count) { tell(T.alone, 3); return; }
-      chatOn = true; box.classList.add("is-on");
-      const x = me.has ? me.x : innerWidth / 2, y = me.has ? me.y : innerHeight * 0.7;
-      box.style.transform = `translate3d(${Math.min(innerWidth - 310, Math.max(12, x + 18))}px, ${Math.min(innerHeight - 110, Math.max(70, y + 18))}px, 0)`;
-      input.value = ""; input.focus({ preventScroll: true });
-    };
-    const closeChat = () => { chatOn = false; box.classList.remove("is-on"); input.blur(); };
-    addEventListener("keydown", (e) => {
-      if (chatOn || typing(e) || e.metaKey || e.ctrlKey || e.altKey || d.getElementById("loader")) return;
-      if (e.key === "Enter" || e.key === "/") { e.preventDefault(); openChat(); }
-    });
-    input.addEventListener("keydown", (e) => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); closeChat(); } });
-    box.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const t = input.value.replace(/\s+/g, " ").trim().slice(0, 140);
-      closeChat();
-      if (!t) return;
-      const x = me.has ? me.x : innerWidth / 2, y = me.has ? me.y : innerHeight / 2, dur = Math.min(2.8, 0.034 * t.length + 0.25);
-      if (share) share.chat({ ...enc(x, y), t });
-      const d2 = showMine("", t);
-      if (window.Sound && Sound.on) Sound.voice(t, d2, voiceOf(share ? share.id : "me", (x / innerWidth) * 2 - 1));
-    });
-    const mx = gsap.quickTo(mine, "x", { duration: 0.35, ease: "power3" }), my = gsap.quickTo(mine, "y", { duration: 0.35, ease: "power3" });
-    gsap.set(mine, { x: innerWidth / 2, y: innerHeight / 2 });
-    addEventListener("pointermove", (e) => { if (!mine.classList.contains("is-on") && !chatOn) { gsap.set(mine, { x: Math.min(e.clientX + BUB.x, innerWidth - 320), y: e.clientY + BUB.y }); return; } mx(Math.min(e.clientX + BUB.x, innerWidth - 320)); my(e.clientY + BUB.y); }, { passive: true });
-    box.addEventListener("click", (e) => { const b = e.target.closest("[data-e]"); if (b) { e.preventDefault(); closeChat(); sendFace(b.dataset.e); } });
-    input.addEventListener("blur", () => setTimeout(() => { if (chatOn && d.activeElement !== input) closeChat(); }, 150));
     // on a phone: a small button to write, only when someone is on the other side
-    const btn = d.createElement("button"); btn.type = "button"; btn.className = "chatbtn mono"; btn.textContent = T.ph.split(/[ ,]/)[0]; d.body.appendChild(btn);
+    const btn = d.createElement("button"); btn.type = "button"; btn.className = "chatbtn mono"; btn.textContent = T.write; d.body.appendChild(btn);
     btn.addEventListener("click", openChat);
     setInterval(() => btn.classList.toggle("is-on", !!(share && share.count && place())), 1000);
     return {

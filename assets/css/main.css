@@ -344,35 +344,21 @@ html:not(.js) .wall__list, .wall.no-gl .wall__list { position: relative; width: 
 .notice { position: fixed; left: 50%; top: calc(var(--bar) + 6px); z-index: 96; margin: 0; padding: 9px 12px 10px; translate: -50% -8px; max-width: min(420px, 86vw); font: 500 15px/1.3 var(--f2); color: #f4f5ef; background: rgba(12, 16, 13, 0.52); border: 1px solid rgba(244, 245, 239, 0.16); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); opacity: 0; pointer-events: none; transition: opacity 0.5s, translate 0.7s var(--ease); }
 .notice { translate: -50% -8px; }
 .notice.is-on { opacity: 1; translate: -50% 0; }
-.notice:not(.is-on), .emo:not(.is-on), .chat:not(.is-on), .chatbtn:not(.is-on) { visibility: hidden; transition-property: opacity, translate, visibility; transition-delay: 0s, 0s, 0.5s; }
-/* my pane: the very same as the one the others see behind their glass */
-.voice.mine { left: 0; top: 0; translate: none; max-width: 304px; padding: 9px 12px 10px; background: rgba(12, 16, 13, 0.66); border-color: rgba(244, 245, 239, 0.16); -webkit-backdrop-filter: none; backdrop-filter: none; line-height: 19.5px; }
-.mine__who { display: block; height: 18px; font: 500 10.5px/14px var(--mono); letter-spacing: 0.02em; text-transform: uppercase; color: rgba(244, 245, 239, 0.6); }
-.mine__t { display: block; }
+.notice:not(.is-on), .emo:not(.is-on), .chatbtn:not(.is-on), .pane--mine:not(.is-on) { visibility: hidden; transition-property: opacity, translate, visibility; transition-delay: 0s, 0s, 0.5s; }
 html.is-saying .cursor { opacity: 0; }
-html:not([data-mode="focus"]) .voice.mine.is-on { opacity: 1; }
 /* the signs: a short row of the interface's own squares over the pointer, white on a dark pane; the one picked fills */
 .emo { position: fixed; left: 0; top: 0; z-index: 97; width: 0; height: 0; pointer-events: none; }
 .emo__row { position: absolute; left: 0; bottom: 22px; translate: -50% 0; display: flex; background: rgba(12, 16, 13, 0.52); border: 1px solid rgba(244, 245, 239, 0.16); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); opacity: 0; transition: opacity 0.25s; }
 .emo.is-on { pointer-events: auto; }
 .emo.is-on .emo__row { opacity: 1; }
-.emo button, .chat__emo button { position: relative; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; color: #f4f5ef; background: none; border: 0; cursor: pointer; isolation: isolate; }
+.emo button { position: relative; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; color: #f4f5ef; background: none; border: 0; cursor: pointer; isolation: isolate; }
 .emo button + button { border-left: 1px solid rgba(244, 245, 239, 0.1); }
-.emo button::before, .chat__emo button::before { content: ""; position: absolute; inset: 0; z-index: -1; background: #f4f5ef; transform: scaleY(0); transform-origin: 50% 100%; transition: transform 0.45s var(--ease); }
+.emo button::before { content: ""; position: absolute; inset: 0; z-index: -1; background: #f4f5ef; transform: scaleY(0); transform-origin: 50% 100%; transition: transform 0.45s var(--ease); }
 .emo button.is-pick::before { transform: scaleY(1); }
-.emo button.is-pick, .chat__emo button:hover { color: #0b0b0b; }
-@media (hover: hover) and (pointer: fine) { .emo button:hover::before, .chat__emo button:hover::before { transform: scaleY(1); } .emo button:hover { color: #0b0b0b; } }
-.emo svg, .chat__emo svg, .voice.mine svg { width: 22px; height: 22px; fill: currentColor; display: block; transition: transform 0.45s var(--ease); }
+.emo button.is-pick { color: #0b0b0b; }
+@media (hover: hover) and (pointer: fine) { .emo button:hover::before { transform: scaleY(1); } .emo button:hover { color: #0b0b0b; } }
+.emo svg, .pane__t svg { width: 22px; height: 22px; fill: currentColor; display: block; transition: transform 0.45s var(--ease); }
 .emo button.is-pick svg { transform: scale(1.1); }
-.voice.mine.is-icon svg { width: 30px; height: 30px; }
-.chat { position: fixed; left: 0; top: 0; z-index: 98; display: grid; gap: 6px; width: 300px; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-.chat.is-on { opacity: 1; pointer-events: auto; }
-.chat__emo { display: flex; width: max-content; background: rgba(12, 16, 13, 0.52); border: 1px solid rgba(244, 245, 239, 0.16); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-.chat__emo button { width: 38px; height: 38px; }
-.chat__emo button + button { border-left: 1px solid rgba(244, 245, 239, 0.1); }
-.chat__emo svg { width: 19px; height: 19px; }
-.chat__in { width: 100%; height: 44px; padding: 0 12px; font: 500 16px var(--f2); color: #f4f5ef; background: rgba(12, 16, 13, 0.6); border: 1px solid rgba(244, 245, 239, 0.3); outline: none; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-.chat__in::placeholder { color: rgba(244, 245, 239, 0.5); }
 .chatbtn { position: fixed; left: 50%; bottom: calc(var(--m) + 64px); z-index: 90; translate: -50% 0; height: 40px; padding: 0 16px; color: #f4f5ef; background: rgba(12, 16, 13, 0.5); border: 1px solid rgba(244, 245, 239, 0.25); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); opacity: 0; pointer-events: none; transition: opacity 0.4s; }
 @media (pointer: coarse) { .chatbtn.is-on { opacity: 1; pointer-events: auto; } }
 /* the loading screen asks your name, without insisting */
@@ -641,3 +627,33 @@ html:not([data-mode="focus"]) .voice.mine.is-on { opacity: 1; }
 .js .space { position: fixed; inset: 0; z-index: 0; display: block; pointer-events: none; background: #040404; }
 .space canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
 .js .canvas { background: transparent; }
+
+/* a person behind the glass: a pointer, a name, and a pane for their words. Blurred and faint as far as the glass
+   between you is frosted (--fz under the pointer, --fp under the words), sharp where it has been wiped */
+.peers { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.wall .peers { z-index: 1; }
+.wall .wall__grid { z-index: 1; }
+.peer { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; will-change: transform; }
+.peer__arrow, .peer__tag { filter: blur(calc(var(--fz, 1) * 7px)); opacity: calc(1 - var(--fz, 1) * 0.45); transition: filter 0.3s, opacity 0.3s; }
+.peer__arrow { position: absolute; left: -1px; top: -1px; width: 17px; height: 23px; max-width: none; fill: #f6f7f2; stroke: rgba(14, 17, 20, 0.85); stroke-width: 1.2; stroke-linejoin: round; transition: transform 0.25s var(--ease), filter 0.3s, opacity 0.3s; transform-origin: 1px 1px; }
+.peer.is-down .peer__arrow { transform: scale(0.86); }
+.peer__tag { position: absolute; left: 15px; top: 21px; padding: 4px 7px; white-space: nowrap; font: 500 10.5px/1 var(--mono); letter-spacing: 0.03em; color: #f4f5ef; background: rgba(12, 16, 13, 0.66); }
+.peer.is-talking .peer__tag { opacity: 0; }
+.peer__pane { position: absolute; left: 20px; top: -6px; opacity: 0; transform: translateY(4px); filter: blur(calc(var(--fp, 1) * 8px)); transition: opacity 0.35s, transform 0.5s var(--ease), filter 0.3s; }
+.peer.is-talking .peer__pane { opacity: calc(1 - var(--fp, 1) * 0.4); transform: none; }
+/* the pane, the same on both sides: the name on top, the words under it */
+.pane { width: max-content; max-width: 304px; padding: 9px 12px 10px; font: 500 15px/19.5px var(--f2); letter-spacing: -0.005em; color: #f4f5ef; background: rgba(12, 16, 13, 0.62); border: 1px solid rgba(244, 245, 239, 0.16); }
+.pane__who { display: block; height: 18px; font: 500 10.5px/14px var(--mono); letter-spacing: 0.03em; text-transform: uppercase; color: rgba(244, 245, 239, 0.6); white-space: nowrap; }
+.pane__t { display: block; overflow-wrap: anywhere; }
+.pane__t svg { width: 30px; height: 30px; }
+.pane__in { display: none; width: 268px; padding: 0; font: inherit; color: inherit; background: none; border: 0; outline: none; caret-color: #f4f5ef; }
+.pane__in::placeholder { color: rgba(244, 245, 239, 0.4); }
+.pane--mine { position: fixed; left: 0; top: 0; z-index: 97; pointer-events: none; opacity: 0; transition: opacity 0.3s; -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); }
+.pane--mine.is-on { opacity: 1; }
+.pane--mine.is-edit { pointer-events: auto; }
+.pane--mine.is-edit .pane__t { display: none; }
+.pane--mine.is-edit .pane__in { display: block; }
+.knock { position: fixed; left: 0; top: 0; z-index: 96; width: 0; height: 0; pointer-events: none; }
+.knock i { position: absolute; left: 0; top: -0.75px; width: 18px; height: 1.5px; background: #f6f7f2; transform-origin: 0 50%; }
+.knock s { position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border: 1.5px solid #f6f7f2; border-radius: 50%; }
+.knock b { position: absolute; left: 0; top: -64px; translate: -50% 0; white-space: nowrap; font: 800 clamp(30px, 3.4vw, 54px)/0.9 var(--f); font-stretch: 112%; text-transform: uppercase; letter-spacing: -0.03em; color: #f6f7f2; text-shadow: 0 2px 24px rgba(20, 30, 40, 0.35); }
