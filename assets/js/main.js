@@ -874,7 +874,7 @@
         if (!o.knockTold || performance.now() - o.knockTold > 20000) { o.knockTold = performance.now(); tell(T.knock(nameOf(o)), 3.5); }
       },
     })).then((s) => { share = s; if (myName) s.name(myName); sendNow(); if (/[?&]test\b/.test(location.search)) window.__share = { s, others }; }).catch((e) => console.info("[glass] alone today:", e && e.message));
-    if (!/[?&]solo\b/.test(location.search) && "RTCPeerConnection" in window) connect();
+    if (!/[?&]solo\b/.test(location.search) && "WebSocket" in window) connect();
 
     // ---- telling them what I do ----
     const pressing = () => { const g = glassOf(place()); return g && g.finger ? 1 : 0; };
