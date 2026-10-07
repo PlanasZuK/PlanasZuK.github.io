@@ -208,8 +208,7 @@
       const dawn = ss(5.2, 7, h) * (1 - ss(8.5, 11, h)), nightW = h >= 12 ? ss(20.6, 22.6, h) : 1 - ss(4.6, 6.2, h);
       const hush = (1 - surge * 0.85) * lerp(1, 0.55, clamp(r - 1));
       const set = (n, v) => { const B = this.beds[n]; if (B) B.out.gain.setTargetAtTime(v, t, first ? 0.05 : 3); };
-      const daylight = s.day ? ss(6.5, 8, h) * (1 - ss(18.5, 20.2, h)) * 0.65 : 0;
-      set("birds", Math.max(dawn, daylight) * hush * 0.9);
+      set("birds", dawn * hush * 0.9);
       set("night", nightW * 0.85);
       set("crickets", nightW * hush * clamp(1.3 - r) * 0.8);
       this.duskW = ss(18, 19.2, h) * (1 - ss(20.8, 21.8, h)) * hush + dawn * 0.25 * hush;
@@ -232,54 +231,6 @@
       s.start(ctx.currentTime + 0.05, off, dur);
     },
     // the fingertip, every frame: speed, how fast it changes, turns, where it is
-    // a knuckle on the window: a short hollow knock, the pane ringing a little after it
-    knock(x = 0, k = 1) {
-      if (!this.on || !this.ctx) return;
-      const ctx = this.ctx, t0 = ctx.currentTime + 0.01, pan = ctx.createStereoPanner(), out = ctx.createGain();
-      pan.pan.value = Math.max(-0.8, Math.min(0.8, x)); out.gain.value = 0.5 * k;
-      out.connect(pan).connect(this.room ? this.master : ctx.destination);
-      if (this.room) out.connect(this.room);
-      const hit = (t, a) => {
-        // the thud of the knuckle on the frame of glass
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = 'sine'; o.frequency.setValueAtTime(190 + Math.random() * 20, t); o.frequency.exponentialRampToValueAtTime(120, t + 0.09);
-        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.14);
-        o.connect(g).connect(out); o.start(t); o.stop(t + 0.16);
-        // and the glass itself, a few short rings
-        for (const [f, d, v] of [[1180, 0.05, 0.16], [2310, 0.035, 0.08], [3420, 0.025, 0.05]]) {
-          const r = ctx.createOscillator(), rg = ctx.createGain();
-          r.frequency.value = f * (0.97 + Math.random() * 0.06);
-          rg.gain.setValueAtTime(0, t); rg.gain.linearRampToValueAtTime(v * a, t + 0.002); rg.gain.exponentialRampToValueAtTime(0.0005, t + d);
-          r.connect(rg).connect(out); r.start(t); r.stop(t + d + 0.02);
-        }
-      };
-      hit(t0, 0.9); hit(t0 + 0.16 + Math.random() * 0.03, 0.75);
-    },
-    // two fingertips meeting through the glass: one soft, warm bell, and its octave, very quietly
-    chime(x = 0) {
-      if (!this.on || !this.ctx) return;
-      const ctx = this.ctx, t = ctx.currentTime + 0.02, pan = ctx.createStereoPanner(), out = ctx.createGain();
-      pan.pan.value = Math.max(-0.7, Math.min(0.7, x)); out.gain.value = 0.22 * this.mix.voice;
-      out.connect(pan).connect(this.near); if (this.room) out.connect(this.room);
-      const f0 = [523.25, 587.33, 659.25, 783.99][(Math.random() * 4) | 0];
-      for (const [m, a, d] of [[1, 1, 3.2], [2.005, 0.35, 2.1], [3.01, 0.12, 1.2], [4.2, 0.05, 0.7]]) {
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.frequency.value = f0 * m; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0004, t + d);
-        o.connect(g).connect(out); o.start(t); o.stop(t + d + 0.05);
-      }
-    },
-    // a breath on the window: soft air, close
-    breath(x = 0, k = 1) {
-      if (!this.on || !this.ctx) return;
-      const ctx = this.ctx, t = ctx.currentTime + 0.01, len = 1.1;
-      const b = ctx.createBuffer(1, Math.round(ctx.sampleRate * len), ctx.sampleRate), d = b.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain(), pan = ctx.createStereoPanner();
-      src.buffer = b; bp.type = 'bandpass'; bp.frequency.setValueAtTime(900, t); bp.frequency.linearRampToValueAtTime(1500, t + len); bp.Q.value = 0.7;
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.06 * k, t + 0.25); g.gain.linearRampToValueAtTime(0, t + len);
-      pan.pan.value = Math.max(-0.7, Math.min(0.7, x));
-      src.connect(bp).connect(g).connect(pan).connect(this.near); src.start(t);
-    },
     fingerMove(v, x, turn, now) {
       if (!this.on || !this.fingerNode) return;
       const dt = Math.max(0.008, (now - (this.fmT || now - 16)) / 1000), a = (v - (this.fmV || 0)) / dt / 8;
@@ -529,9 +480,8 @@
     // words carry accents, the ending says what kind of sentence it is (a question rises, a statement settles,
     // an exclamation jumps), and the mood sets register, range, tempo, breath and wobble. Sometimes it goes "oh!",
     // sighs, grumbles, or laughs at its own joke. Never the same twice.
-    vox(key = "me") {
-      this.vxs = this.vxs || {};
-      if (this.vxs[key]) return this.vxs[key];
+    vox() {
+      if (this.vx) return this.vx;
       const ctx = this.ctx, g = (v = 0) => { const n = ctx.createGain(); n.gain.value = v; return n; };
       const pitch = ctx.createConstantSource(); pitch.offset.value = 440;
       const car = ctx.createOscillator(), body = ctx.createOscillator(), mod = ctx.createOscillator(), vib = ctx.createOscillator();
@@ -558,7 +508,7 @@
       const breath = g(0); ns.connect(air).connect(breath).connect(pan);
       out.connect(this.near); const send = g(0.5); out.connect(send).connect(this.room);
       [pitch, car, body, mod, vib, ns].forEach((o) => o.start());
-      return (this.vxs[key] = { pitch, env, f1, f2, pan, wob, out, idx, soft, breath, air });
+      return (this.vx = { pitch, env, f1, f2, pan, wob, out, idx, soft, breath, air });
     },
     // how the line feels: register (Hz), range, tempo, legato, wobble, brightness, breath
     mood(text) {
@@ -581,30 +531,30 @@
       else if (/\?\s*$/.test(t)) k = "curious";
       return { k, ...M[k] };
     },
-    voice(text, dur, who) {
+    voice(text, dur) {
       if (!this.on || !text) return;
-      if (!who) this.stopThinking();
-      const ctx = this.ctx, V = this.vox(who ? who.key : "me"), len = text.length, R = Math.random, st = (s) => Math.pow(2, s / 12);
+      this.stopThinking();
+      const ctx = this.ctx, V = this.vox(), len = text.length, R = Math.random, st = (s) => Math.pow(2, s / 12);
       dur = dur || Math.min(2.8, 0.034 * len + 0.25);
       const mood = this.mood(text), lower = text.toLowerCase();
       // this utterance's own register: never exactly the last one
-      const base = mood.base * st((R() - 0.5) * 2 + (who ? who.pitch : 0)), range = mood.range * (0.85 + R() * 0.3) * (who ? who.range : 1);
+      const base = mood.base * st((R() - 0.5) * 2), range = mood.range * (0.85 + R() * 0.3);
       let now = ctx.currentTime + 0.03;
       this.keys(text, dur, now);
-      if (!who) this.duck.gain.cancelScheduledValues(now);
+      this.duck.gain.cancelScheduledValues(now);
       this.duck.gain.setTargetAtTime(0.72, now, 0.08); this.duck.gain.setTargetAtTime(1, now + dur + 0.9, 0.5);
       const el = document.querySelector(".voice"), r = el && el.getBoundingClientRect();
-      V.pan.pan.setTargetAtTime(who ? clamp(who.x, -1, 1) * 0.7 : r ? clamp(((r.left + r.width / 2) / innerWidth) * 2 - 1, -1, 1) * 0.5 : 0, now, 0.05);
-      V.wob.gain.setTargetAtTime(mood.wob * (who ? who.wob : 1), now, 0.05);
+      V.pan.pan.setTargetAtTime(r ? clamp(((r.left + r.width / 2) / innerWidth) * 2 - 1, -1, 1) * 0.5 : 0, now, 0.05);
+      V.wob.gain.setTargetAtTime(mood.wob, now, 0.05);
       V.out.gain.setTargetAtTime(this.mix.voice, now, 0.02);
-      V.idx.gain.setTargetAtTime((0.22 + 0.12 * mood.bright) * (who ? who.fm : 1), now, 0.05);
+      V.idx.gain.setTargetAtTime(0.22 + 0.12 * mood.bright, now, 0.05);
       V.soft.frequency.setTargetAtTime(3800 + 2200 * mood.bright, now, 0.05);
       const P = V.pitch.offset, E = V.env.gain, B = V.breath.gain;
       P.cancelScheduledValues(now); E.cancelScheduledValues(now); B.cancelScheduledValues(now);
       E.setValueAtTime(0, now); B.setValueAtTime(0, now);
       const FORM = { a: [800, 1250], e: [520, 1850], i: [330, 2250], o: [520, 950], u: [360, 820] };
       const note = (t, d, f, vow, amp, glide = 1, gl = 0.5) => {
-        const [F1, F2] = FORM[vow] || FORM.a, sh = (0.94 + R() * 0.12) * (who ? who.form : 1);
+        const [F1, F2] = FORM[vow] || FORM.a, sh = 0.94 + R() * 0.12;
         P.setTargetAtTime(f, t, 0.011);
         if (glide !== 1) P.setTargetAtTime(f * glide, t + d * gl, d * 0.45);
         V.f1.frequency.setTargetAtTime(F1 * sh, t, 0.012); V.f2.frequency.setTargetAtTime(F2 * sh, t, 0.012);

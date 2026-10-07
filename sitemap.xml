@@ -1,39 +1,192 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://polplanas.com/</loc></url>
-  <url><loc>https://polplanas.com/work/</loc></url>
-  <url><loc>https://polplanas.com/about/</loc></url>
-  <url><loc>https://polplanas.com/services/</loc></url>
-  <url><loc>https://polplanas.com/contact/</loc></url>
-  <url><loc>https://polplanas.com/work/fornal/</loc></url>
-  <url><loc>https://polplanas.com/work/radi/</loc></url>
-  <url><loc>https://polplanas.com/work/fang/</loc></url>
-  <url><loc>https://polplanas.com/work/solell/</loc></url>
-  <url><loc>https://polplanas.com/work/bloc/</loc></url>
-  <url><loc>https://polplanas.com/work/rosella/</loc></url>
-  <url><loc>https://polplanas.com/privacy/</loc></url>
-  <url><loc>https://polplanas.com/ca/</loc></url>
-  <url><loc>https://polplanas.com/ca/work/</loc></url>
-  <url><loc>https://polplanas.com/ca/about/</loc></url>
-  <url><loc>https://polplanas.com/ca/services/</loc></url>
-  <url><loc>https://polplanas.com/ca/contact/</loc></url>
-  <url><loc>https://polplanas.com/ca/work/fornal/</loc></url>
-  <url><loc>https://polplanas.com/ca/work/radi/</loc></url>
-  <url><loc>https://polplanas.com/ca/work/fang/</loc></url>
-  <url><loc>https://polplanas.com/ca/work/solell/</loc></url>
-  <url><loc>https://polplanas.com/ca/work/bloc/</loc></url>
-  <url><loc>https://polplanas.com/ca/work/rosella/</loc></url>
-  <url><loc>https://polplanas.com/ca/privacy/</loc></url>
-  <url><loc>https://polplanas.com/es/</loc></url>
-  <url><loc>https://polplanas.com/es/work/</loc></url>
-  <url><loc>https://polplanas.com/es/about/</loc></url>
-  <url><loc>https://polplanas.com/es/services/</loc></url>
-  <url><loc>https://polplanas.com/es/contact/</loc></url>
-  <url><loc>https://polplanas.com/es/work/fornal/</loc></url>
-  <url><loc>https://polplanas.com/es/work/radi/</loc></url>
-  <url><loc>https://polplanas.com/es/work/fang/</loc></url>
-  <url><loc>https://polplanas.com/es/work/solell/</loc></url>
-  <url><loc>https://polplanas.com/es/work/bloc/</loc></url>
-  <url><loc>https://polplanas.com/es/work/rosella/</loc></url>
-  <url><loc>https://polplanas.com/es/privacy/</loc></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://polplanas.com/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/work/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/work/fornal/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/fornal/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/work/radi/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/radi/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/work/fang/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/fang/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/work/solell/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/solell/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/work/bloc/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/bloc/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/work/rosella/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/rosella/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/privacy/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/work/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/work/fornal/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/fornal/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/work/radi/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/radi/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/work/fang/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/fang/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/work/solell/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/solell/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/work/bloc/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/bloc/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/work/rosella/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/rosella/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/ca/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/privacy/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/work/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/work/fornal/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/fornal/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/fornal/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/work/radi/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/radi/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/radi/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/work/fang/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/fang/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/fang/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/work/solell/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/solell/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/solell/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/work/bloc/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/bloc/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/bloc/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/work/rosella/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/work/rosella/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/work/rosella/"/>
+  </url>
+  <url>
+    <loc>https://polplanas.com/es/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://polplanas.com/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="ca" href="https://polplanas.com/ca/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://polplanas.com/es/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://polplanas.com/privacy/"/>
+  </url>
 </urlset>
